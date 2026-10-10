@@ -1,0 +1,58 @@
+--- C:/esp/v6.1/esp-idf/components/lwip/apps/ping/ping_sock.c
++++ patches/ping_sock.c
+@@ -6,6 +6,7 @@
+ 
+ #include <stdlib.h>
+ #include <stdbool.h>
++#include <stdatomic.h>
+ #include <sys/time.h>
+ #include <net/if.h>
+ #include "freertos/FreeRTOS.h"
+@@ -25,6 +26,7 @@
+ #include "esp_log.h"
+ #include "ping/ping_sock.h"
+ #include "esp_check.h"
++#include "ping_receive_guard.h"
+ 
+ const static char *TAG = "ping_sock";
+ 
+@@ -54,7 +56,8 @@
+     uint32_t total_time_ms;
+     uint8_t ttl;
+     uint8_t tos;
+-    uint32_t flags;
++    atomic_uint flags;
++    uint32_t timeout_ms;
+     void (*on_ping_success)(esp_ping_handle_t hdl, void *args);
+     void (*on_ping_timeout)(esp_ping_handle_t hdl, void *args);
+     void (*on_ping_end)(esp_ping_handle_t hdl, void *args);
+@@ -96,7 +99,9 @@
+     ip_addr_t recv_addr;
+     ip_addr_copy(recv_addr, *IP_ADDR_ANY);
+ 
+-    while ((len = recvfrom(ep->sock, buf, sizeof(buf), 0, (struct sockaddr *)&from, (socklen_t *)&fromlen)) > 0) {
++    uint32_t started = sys_now();
++    while (ping_receive_continue(ep->flags & PING_FLAGS_START, (uint32_t)(sys_now() - started), ep->timeout_ms) &&
++           (len = recvfrom(ep->sock, buf, sizeof(buf), 0, (struct sockaddr *)&from, (socklen_t *)&fromlen)) > 0) {
+ #if CONFIG_LWIP_IPV4
+         if (from.ss_family == AF_INET) {
+             // IPv4
+@@ -146,8 +151,8 @@
+         }
+         fromlen = sizeof(from);
+     }
+-    // if timeout, len will be -1
+-    return len;
++    // Timeout, stop request, or absolute deadline: no matched echo.
++    return -1;
+ }
+ 
+ static void esp_ping_thread(void *args)
+@@ -238,6 +243,7 @@
+     ep->recv_addr = config->target_addr;
+     ep->count = config->count;
+     ep->interval_ms = config->interval_ms;
++    ep->timeout_ms = config->timeout_ms;
+     ep->icmp_pkt_size = sizeof(struct icmp_echo_hdr) + config->data_size;
+     ep->packet_hdr = mem_calloc(1, ep->icmp_pkt_size);
+     ESP_GOTO_ON_FALSE(ep->packet_hdr,ESP_ERR_NO_MEM, err, TAG, "no memory for echo packet");

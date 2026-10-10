@@ -1,0 +1,41 @@
+# ESP-IDF build output and downloaded components
+build/
+build_*/
+managed_components/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Compiler output, firmware images, and temporary logs
+*.log
+*.elf
+*.bin
+*.map
+*.o
+*.obj
+*.a
+
+# Local IDE settings and caches
+.vscode/
+.idea/
+
+# Generated CMake metadata
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# Generated configuration backups (sdkconfig itself is tracked)
+sdkconfig.old
+sdkconfig.*.old
+
+# Root validation-run evidence; JSON fixtures elsewhere remain trackable
+/*_baseline.json
+/*_integrity_before.json
+/*_integrity_results.json
+/*_test_results.json
+/profinet_phase_b_source_changes.json
+
+# Local operating-system files
+.DS_Store
+Thumbs.db

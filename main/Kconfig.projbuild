@@ -1,0 +1,9 @@
+menu "Syndetis AutoTest"
+    config SYNDETIS_AUTOTEST_DNS_HOSTNAME
+        string "Optional site-local DNS test hostname (empty disables resolution)"
+        default ""
+        help
+            Set only a hostname provided by the local site if DNS resolution
+            should be tested. There is no default hostname or Internet target.
+            An empty value checks DNS configuration and skips resolution.
+endmenu

@@ -1,0 +1,76 @@
+--- C:/esp/v6.1/esp-idf/components/esp_eth/src/mac/esp_eth_mac_esp_dma.c
++++ patches/esp_eth_mac_esp_dma.c
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include "esp_check.h"
++#include "rx_ring_guard.h"
+ #include "sdkconfig.h"
+ #include "soc/soc_caps.h"
+ #include "esp_cache.h"
+@@ -315,6 +316,7 @@
+ 
+ static esp_err_t emac_esp_dma_get_valid_recv_len(emac_esp_dma_handle_t emac_esp_dma, uint32_t *ret_len)
+ {
++    *ret_len = 0;
+     eth_dma_rx_descriptor_t *desc_iter = emac_esp_dma->rx_desc;
+     uint32_t used_descs = 0;
+     DMA_CACHE_INVALIDATE(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
+@@ -332,6 +334,10 @@
+                 return ESP_FAIL;
+             }
+             /* Get the Frame Length of the received packet: substruct 4 bytes of the CRC */
++            if (desc_iter->RDES0.FrameLength <= ETH_CRC_LENGTH) {
++                emac_esp_dma_flush_recv_frame(emac_esp_dma);
++                return ESP_FAIL;
++            }
+             *ret_len = desc_iter->RDES0.FrameLength - ETH_CRC_LENGTH;
+             break;
+         }
+@@ -434,7 +440,13 @@
+         DMA_CACHE_INVALIDATE(desc_iter->Buffer1Addr, CONFIG_ETH_DMA_BUFFER_SIZE);
+         memcpy(buf, (void *)(desc_iter->Buffer1Addr), copy_len);
+         /* `copy_len` does not include CRC (which may be stored in separate buffer), hence check if we reached the last descriptor */
++        unsigned walked = 0;
+         while (!desc_iter->RDES0.LastDescriptor) {
++            if (!rx_ring_step(&walked, CONFIG_ETH_DMA_RX_BUFFER_NUM)) {
++                emac_esp_dma_flush_recv_frame(emac_esp_dma);
++                ESP_LOGW(TAG, "RX frame missing last descriptor; dropped bounded ring");
++                return 0;
++            }
+             desc_iter->RDES0.Own = EMAC_LL_DMADESC_OWNER_DMA;
+             DMA_CACHE_WB(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
+             desc_iter = (eth_dma_rx_descriptor_t *)(desc_iter->Buffer2NextDescAddr);
+@@ -463,21 +475,21 @@
+ void emac_esp_dma_flush_recv_frame(emac_esp_dma_handle_t emac_esp_dma)
+ {
+     eth_dma_rx_descriptor_t *desc_iter = emac_esp_dma->rx_desc;
+-
+-    DMA_CACHE_INVALIDATE(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
+-    /* While not last descriptor => return back to DMA */
+-    while (!desc_iter->RDES0.LastDescriptor) {
++    unsigned walked = 0;
++    bool last = false;
++    /* Link loss/reset may leave a partial ring with no LastDescriptor.
++     * Return at most the configured ring to DMA; never spin or reset the chip. */
++    while (rx_ring_step(&walked, CONFIG_ETH_DMA_RX_BUFFER_NUM)) {
++        DMA_CACHE_INVALIDATE(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
++        last = desc_iter->RDES0.LastDescriptor;
+         desc_iter->RDES0.Own = EMAC_LL_DMADESC_OWNER_DMA;
+         DMA_CACHE_WB(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
+         desc_iter = (eth_dma_rx_descriptor_t *)(desc_iter->Buffer2NextDescAddr);
+-    }
+-    /* the last descriptor */
+-    desc_iter->RDES0.Own = EMAC_LL_DMADESC_OWNER_DMA;
+-    DMA_CACHE_WB(desc_iter, EMAC_HAL_DMA_DESC_SIZE);
+-    /* update rxdesc */
+-    emac_esp_dma->rx_desc = (eth_dma_rx_descriptor_t *)(desc_iter->Buffer2NextDescAddr);
+-    /* poll rx demand */
++        if (last) break;
++    }
++    emac_esp_dma->rx_desc = desc_iter;
+     emac_hal_receive_poll_demand(&emac_esp_dma->hal);
++    if (!last) ESP_LOGW(TAG, "RX partial frame flushed within descriptor-ring limit");
+ }
+ 
+ esp_err_t emac_esp_del_dma(emac_esp_dma_handle_t emac_esp_dma)

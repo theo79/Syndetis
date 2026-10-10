@@ -1,0 +1,24 @@
+{
+  "verified_on": "2026-10-10",
+  "note": "IEEE download unavailable; deliberately small table verified against primary vendor publications. No inferred prefixes.",
+  "sources": [
+    {
+      "prefixes": [
+        "00000C",
+        "000142",
+        "000143"
+      ],
+      "vendor": "Cisco",
+      "url": "https://community.cisco.com/t5/lan-%E3%82%B9%E3%82%A4%E3%83%83%E3%83%81%E3%83%B3%E3%82%B0/cisco-systems-inc-%E3%81%AEmac-address/m-p/1556358/highlight/true",
+      "evidence": "Cisco-hosted reproduction of IEEE registration rows."
+    },
+    {
+      "prefixes": [
+        "001B1B"
+      ],
+      "vendor": "Siemens",
+      "url": "https://www.automation.siemens.com/sce-static/learning-training-documents/tia-portal/hw-config-s7-1500/sce-012-100-unspecific-hardware-configuration-s7-1500-r1703-en.pdf",
+      "evidence": "Page 42 shows Siemens CPU MAC 00-1B-1B-71-5C-CD."
+    }
+  ]
+}
