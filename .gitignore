@@ -1,41 +1,45 @@
-# ESP-IDF build output and downloaded components
-build/
-build_*/
-managed_components/
+# ESP-IDF/CMake build directories, including archived build evidence.
+/build/
+/build_*/
+/build-*/
+/cmake-build-/
 
-# Python caches
+# Generated configuration backup; retain sdkconfig and sdkconfig.defaults.
+/sdkconfig.old
+
+# Python caches.
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
-# Compiler output, firmware images, and temporary logs
-*.log
-*.elf
-*.bin
-*.map
+# Compiler/linker outputs.
 *.o
 *.obj
 *.a
+*.elf
+*.bin
+*.map
 
-# Local IDE settings and caches
+# Generated logs.
+*.log
+
+# Existing root-level validation/evidence JSON.
+/gcc_validation_*.json
+/icmp_hardening_*.json
+/phase_*_*.json
+/profinet_phase_b_*.json
+/profinet_regression_*.json
+/snmp_*.json
+
+# Generated Git statistics.
+/snmp_git_diff_stat.txt
+
+# Local editor settings and credentials.
 .vscode/
 .idea/
-
-# Generated CMake metadata
-CMakeFiles/
-CMakeCache.txt
-compile_commands.json
-
-# Generated configuration backups (sdkconfig itself is tracked)
-sdkconfig.old
-sdkconfig.*.old
-
-# Root validation-run evidence; JSON fixtures elsewhere remain trackable
-/*_baseline.json
-/*_integrity_before.json
-/*_integrity_results.json
-/*_test_results.json
-/profinet_phase_b_source_changes.json
-
-# Local operating-system files
-.DS_Store
-Thumbs.db
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/Github_Syndetis/

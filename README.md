@@ -1,3 +1,8 @@
+> GitHub source snapshot: firmware version `0.7.0-dev`, from `version.txt`.
+> See [GITHUB_SETUP.md](GITHUB_SETUP.md) for build requirements and upload steps.
+> The milestone descriptions and test records below are historical; packaging
+> this directory did not run a firmware build or hardware validation.
+
 # Syndetis firmware foundation
 
 Target: WT32-ETH01 V1.4 / ESP32 / 4 MB flash / ESP-IDF 6.1.0.
@@ -11,7 +16,7 @@ are deferred. Hardware reception and runtime regressions remain validation gates
 See [LLDP_PHASE_B_0.5.0_DEV.md](LLDP_PHASE_B_0.5.0_DEV.md) for implementation,
 verification limitations, and the physical test procedure.
 
-## Current release: 0.4.2 — Fast Discover
+## Current release: 0.4.2 ï¿½ Fast Discover
 
 Discover issues a controlled ARP sweep at at most 25 requests/second, collects
 stable entries continuously into its own table, settles for approximately
