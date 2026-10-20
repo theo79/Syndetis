@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Syndetis · Ethernet field tool</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10191e;color:#eaf0f2;font:16px system-ui,sans-serif;line-height:1.5}
+main{max-width:880px;margin:auto;padding:32px 20px}header{margin-bottom:30px}h1{font-size:36px;letter-spacing:-1px;margin:0}p{margin:6px 0;color:#a8bdc7}
+.label{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#87d4d3}#connection{margin:24px 0;padding:12px 16px;border:1px solid #57717e;border-radius:8px;background:#243139}
+#connection.stale{color:#ffd3a8;border-color:#d39a5c}section{border:1px solid #354a55;border-radius:12px;background:#17262e;margin:20px 0;padding:20px}h2{font-size:20px;margin:0 0 16px}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:0}dt{color:#a8bdc7}dd{margin:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.stale-data{opacity:.55}footer{font-size:14px;color:#a8bdc7}#last{font-size:13px}#error{color:#ffd3a8}
+.neighbor{border-top:1px solid #354a55;margin-top:18px;padding-top:16px}.neighbor h3{margin:0 0 12px;font-size:17px}.expired{border-left:3px solid #d39a5c;padding-left:12px}
+@media(max-width:480px){main{padding:24px 16px}h1{font-size:32px}section{padding:16px}dl{gap:12px;font-size:14px}}
+</style>
+<main>
+<header><div class="label">Ethernet field tool</div><h1>Syndetis</h1><p>Physical link monitoring · read-only dashboard</p></header>
+<div id="connection" class="stale" role="status" aria-live="polite">Waiting for tester · data unavailable</div>
+<div id="data" class="stale-data">
+<section><h2>Device</h2><dl><dt>Firmware</dt><dd id="firmware">—</dd><dt>Uptime</dt><dd id="uptime">—</dd></dl></section>
+<section><h2>Ethernet</h2><dl><dt>Initialization</dt><dd id="initialization">—</dd><dt>Physical link</dt><dd id="link">—</dd><dt>Negotiated speed</dt><dd id="speed">—</dd><dt>Duplex</dt><dd id="duplex">—</dd><dt>Ethernet MAC</dt><dd id="mac">—</dd><dt>Ethernet IP</dt><dd id="ip">Not configured</dd></dl><p id="error" hidden></p></section>
+<section><h2>Switch Info</h2><p id="switch-state">Waiting for status</p><p id="switch-limits"></p><div id="neighbors"></div><p>Passive advertisements only. Advertised addresses belong to the neighbor, not the tester. PVID/native VLAN is not a complete VLAN list.</p></section>
+</div>
+<p id="last">No successful update yet</p>
+<footer>Management hotspot: 192.168.4.1. Ethernet has no IP configuration.<br>Disable Web Access on the physical tester to stop this server. There is no separate dashboard login while access is enabled.</footer>
+</main>
+<script>
+'use strict';
+const el=id=>document.getElementById(id);
+let lastSuccess=0;
+function renderSwitch(info){
+  if(!info||!Array.isArray(info.neighbors)||info.neighbors.length>4||typeof info.state!=='string')
+    throw new Error('Invalid switch status');
+  el('switch-state').textContent=info.state+(info.state==='No advertisement received'?' after 30 seconds; still listening.':'');
+  el('switch-limits').textContent=`Capacity ${info.capacity} · capacity drops ${info.capacity_drops} · queue drops ${info.queue_drops} · limited frames ${info.limited_frames} · invalid frames ${info.invalid_frames}`;
+  const container=el('neighbors');
+  container.replaceChildren();
+  for(const n of info.neighbors){
+    const card=document.createElement('div');
+    card.className='neighbor'+(n.expired?' expired':'');
+    const title=document.createElement('h3');
+    title.textContent=`${n.protocol} · record ${n.slot} · ${n.expired?'Expired':'Current'}`;
+    card.append(title);
+    const list=document.createElement('dl');
+    const field=(name,value)=>{
+      const label=document.createElement('dt'), data=document.createElement('dd');
+      label.textContent=name;
+      data.textContent=value===null?'Unavailable':value===''?'(empty)':String(value);
+      list.append(label,data);
+    };
+    field('Source MAC',n.source_mac);field('System/device name',n.name);
+    field('Chassis identifier',n.chassis);field('Port ID',n.port_id);
+    field('Port description',n.port_description);
+    field(n.management_source==='CDP address TLV'?'Advertised IP (CDP address TLV)':'Management IP',n.management_ip);
+    field(n.vlan_kind,n.vlan);field('TTL',`${n.ttl_seconds} s`);field('Age',`${n.age_seconds} s`);
+    if(n.sanitized)field('Text note','Non-ASCII/control bytes replaced with ?');
+    card.append(list);container.append(card);
+  }
+}
+function stale(){
+  el('connection').textContent='Tester unreachable · displayed data is stale';
+  el('connection').classList.add('stale');
+  el('data').classList.add('stale-data');
+}
+async function poll(){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),2500);
+  try{
+    const response=await fetch('/api/status',{cache:'no-store',signal:controller.signal});
+    if(!response.ok)throw new Error('Status request failed');
+    const s=await response.json(), e=s.ethernet;
+    if(typeof s.firmware!=='string'||!Number.isFinite(s.uptime_seconds)||!e||
+       !['Initializing','Ready','Error'].includes(e.initialization)||
+       !['Up','Down','Unavailable'].includes(e.link)||
+       ![null,10,100].includes(e.speed_mbps)||!['Full','Half','Unavailable'].includes(e.duplex)||
+       typeof e.mac!=='string'||e.ip!=='Not configured')throw new Error('Invalid status');
+    el('firmware').textContent=s.firmware;
+    const seconds=s.uptime_seconds;
+    el('uptime').textContent=`${Math.floor(seconds/3600)}h ${Math.floor(seconds/60)%60}m ${seconds%60}s`;
+    el('initialization').textContent=e.initialization;
+    el('link').textContent=e.link;
+    el('speed').textContent=e.speed_mbps===null?'Unavailable':`${e.speed_mbps} Mbps`;
+    el('duplex').textContent=e.duplex;
+    el('mac').textContent=e.mac;
+    el('ip').textContent=e.ip;
+    el('error').hidden=e.initialization!=='Error';
+    el('error').textContent=e.initialization==='Error'?`Ethernet error: ${e.error_step} (code ${e.error_code})`:'';
+    renderSwitch(s.switch_info);
+    lastSuccess=Date.now();
+    el('last').textContent=`Last update: ${new Date(lastSuccess).toLocaleTimeString()}`;
+    el('connection').textContent='Connected to tester · live status';
+    el('connection').classList.remove('stale');
+    el('data').classList.remove('stale-data');
+  }catch(error){stale();}
+  finally{clearTimeout(timeout);setTimeout(poll,1000);}
+}
+// Separate age check also catches suspended/delayed polls on return to a tab.
+setInterval(()=>{if(lastSuccess&&Date.now()-lastSuccess>4000)stale();},500);
+document.addEventListener('visibilitychange',()=>{if(lastSuccess&&Date.now()-lastSuccess>4000)stale();});
+poll(); // Next request is scheduled only after this one settles: never overlap.
+</script>
+</html>
