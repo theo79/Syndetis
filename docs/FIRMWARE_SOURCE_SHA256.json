@@ -1,0 +1,162 @@
+[
+  {
+    "path": "main/access_config.h",
+    "sha256_lf": "9186d9bc5d3e311967d0d74c16ef47bd82e5ecc6909ff23f676c6e3d2b9d2eda"
+  },
+  {
+    "path": "main/board.h",
+    "sha256_lf": "ac96b3eff6d6a34785a75abe9731a0fae911ea53dc72b0a33cfb0f03e438fdfe"
+  },
+  {
+    "path": "main/button_logic.c",
+    "sha256_lf": "c5e10d1df8bdd3d8ce6b3f6d7275bca0b4e75f93772fcc5b208d4bde42645d6e"
+  },
+  {
+    "path": "main/button_logic.h",
+    "sha256_lf": "449700c86ba4f84b5d088353bbf085efecf349673602115e1937987c1ba17999"
+  },
+  {
+    "path": "main/buttons.c",
+    "sha256_lf": "854904f39a16ce6bb74d21fd3b4884704f418b185e881e0042fcce3dd8e116df"
+  },
+  {
+    "path": "main/buttons.h",
+    "sha256_lf": "a130e07ebf47e6648bbbd7002b8276241a8f79f2db038acb64b5f53baa15bccb"
+  },
+  {
+    "path": "main/CMakeLists.txt",
+    "sha256_lf": "64adc2826574f83b4c09bb89aecb5b96f0a73dbeb60882a39e3b114d7e9e37fc"
+  },
+  {
+    "path": "main/dashboard.c",
+    "sha256_lf": "121687e0b5ae8e9f4f0c5627d20f287a47949a93956dcd7dd1ccb578fa9e0e2a"
+  },
+  {
+    "path": "main/dashboard.h",
+    "sha256_lf": "6496130c7cf4f2b1c97bb38cd04c89388492a38bfbe798504479a8509049d3a8"
+  },
+  {
+    "path": "main/dashboard.html",
+    "sha256_lf": "c19187fdfc0a5436c04e1fe8cd852d6fa38075a1ab475f62f47102c680c5a745"
+  },
+  {
+    "path": "main/dhcp_test.c",
+    "sha256_lf": "7c400c66c4862decf5c91ce99b464105c1c42708513664f04fa97a04b2f2df1d"
+  },
+  {
+    "path": "main/dhcp_test.h",
+    "sha256_lf": "d4d112da2c632522d4f38776aa8d24126982a761c7dbaf9dff8f9f086ba9f5f6"
+  },
+  {
+    "path": "main/discovery.c",
+    "sha256_lf": "d02525d92662b7f181a2f06af1ae442ec4e95b7c5545ac8eebf5ae7ef3ba7bf0"
+  },
+  {
+    "path": "main/discovery.h",
+    "sha256_lf": "1ffedc87243f3bc1283a7a2fb238458d40f188a411eff8e85b042dbd89d6cc38"
+  },
+  {
+    "path": "main/display.c",
+    "sha256_lf": "49f82dd7a7b1ba5827c63c477a1bc8ca3a20ac4d9a85d600ad73eddf2decdffa"
+  },
+  {
+    "path": "main/display.h",
+    "sha256_lf": "606813ea1ae04cdfeed023f0332d23fe6abdcde093d97af3c10b37c2b13b525d"
+  },
+  {
+    "path": "main/ethernet.c",
+    "sha256_lf": "566a64b252e9685218e0b04506f87de04ab6d25bb27180a232d645868358ebe1"
+  },
+  {
+    "path": "main/ethernet.h",
+    "sha256_lf": "0a63e3a15aa7b1222cb180186ac8915068276854e5d3c28c3f91acb74583db75"
+  },
+  {
+    "path": "main/idf_component.yml",
+    "sha256_lf": "70a513ec6d9f76646fe680c0ace94580c6d59d896d1e43acba3254f532fc978d"
+  },
+  {
+    "path": "main/main.c",
+    "sha256_lf": "77480bb36457faa0622a6b9b277298f3a2774b85a6eaee2e6980ac3b8a5eb65b"
+  },
+  {
+    "path": "main/manual_ipv4.c",
+    "sha256_lf": "a0c916facab116dd2ec72c18b00043a3401fdb1e82c5d8fb6d1818a7d5056719"
+  },
+  {
+    "path": "main/manual_ipv4.h",
+    "sha256_lf": "35d2a38291cea49b9789912ba64312fb186e177af68f6d71bed33a2484353a5d"
+  },
+  {
+    "path": "main/neighbors.c",
+    "sha256_lf": "7e5c26e25ab2f5f7959bb0f06547e68b5b12bd698fecd9b95d2282ded00945a2"
+  },
+  {
+    "path": "main/neighbors.h",
+    "sha256_lf": "aa2ed39db43fc02729f5dcc1e2772547852dad901d111e1f163a62a055eaef91"
+  },
+  {
+    "path": "main/network_ping.c",
+    "sha256_lf": "9e5a3830d27c18807aa9f074bf8b5e613f31470a981eb9c88abfbfacd5400a3e"
+  },
+  {
+    "path": "main/network_ping.h",
+    "sha256_lf": "99f51b8362a1e7af763618c6385f57fe220b4a1ee4d54f4b7822c1f7bf6ac687"
+  },
+  {
+    "path": "main/network_policy.c",
+    "sha256_lf": "a0f71a2a321e40b95fcf1b46d3c6a6dab1b0a51ff062f5c56c374530e529c089"
+  },
+  {
+    "path": "main/network_policy.h",
+    "sha256_lf": "0804f537bbfe8910cb1ee920bd2413324ab7f4be083137608faad4e1a03d8204"
+  },
+  {
+    "path": "main/ping_packet.c",
+    "sha256_lf": "397db412a692fe257a305b2c0ce9650dfdb394ec1b9e0e746f6c89953d079c7d"
+  },
+  {
+    "path": "main/ping_packet.h",
+    "sha256_lf": "684b3306024bdca3a7e9bbee73052ffbecc228e4b609332ecdefa2aec4bb9ab1"
+  },
+  {
+    "path": "main/ping_target.h",
+    "sha256_lf": "51b4066e0353d0c427a924f4fd282d285e6d46007c1b7440ecd1a853b0b59fc5"
+  },
+  {
+    "path": "main/receive_dispatch.h",
+    "sha256_lf": "389dde5c2e9ec0c0cf665d4d471324901d8b35b29f0fa7c6523731dcc774eb2e"
+  },
+  {
+    "path": "main/services.c",
+    "sha256_lf": "41f7214041693eb257c8e1ebd47292a04c237337e0f8c7304eb6f92d9410ef19"
+  },
+  {
+    "path": "main/services.h",
+    "sha256_lf": "8ba6679cd4a5e1ad139f9405fd4ad8ccca9162218f9583c06b0255806e2770ab"
+  },
+  {
+    "path": "main/status.c",
+    "sha256_lf": "11438958042203fbb35cb886905b54d7fb99994cb6b67b48a558bd9731ecdb4f"
+  },
+  {
+    "path": "main/status.h",
+    "sha256_lf": "9d9b66596341646d582c8043a51ae92dcb9d168ddd84116e035e3453607a3c5e"
+  },
+  {
+    "path": "main/ui.c",
+    "sha256_lf": "8c4607636fac6c49af772568b907799a91c03026aa49a47d7c06c78084d1e590"
+  },
+  {
+    "path": "main/ui.h",
+    "sha256_lf": "1abdab1e69141685b84494995c952b18352c3865b91c6b7d7c4b05f038734b33"
+  },
+  {
+    "path": "main/web_guard.c",
+    "sha256_lf": "17c90776d3dfe4ce3a66c433c9ac5ab8a3ebdf4253f1a207ec160eeb65e19b08"
+  },
+  {
+    "path": "main/web_guard.h",
+    "sha256_lf": "09c8b1a3064d67dbb9882297ed93cd42c87b486a1921224ffc7c7d3d255e2299"
+  }
+]

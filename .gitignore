@@ -1,0 +1,13 @@
+/build*/
+/sdkconfig
+/sdkconfig.old
+/managed_components/
+/tmp/
+/node_modules/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.key
+*.pcap
+*.pcapng
