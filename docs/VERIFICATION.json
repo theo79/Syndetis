@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-27",
+  "build": {
+    "target": "esp32",
+    "application_version": "0.4.0",
+    "application_bytes": 905664,
+    "free_bytes": 142912,
+    "sha256": "a02a7694a766f08fc1e9bb3ecc9ba86db57c7f7a8419a45e4da392087a285961",
+    "effective_config_identical": true,
+    "partition_identical": true
+  },
+  "tests": "PASS: eight C suites, JSON/Node and Chrome phone/laptop browser; own locked Playwright dependency",
+  "sdk_commit": "fff9895c82d744c7237be8847347bdd1b07c6643",
+  "hardware_acceptance": "5A and 5B passed, user reported; no device operation in packaging",
+  "linux_execution": false,
+  "primary_source_and_index_unchanged": true
+}
