@@ -4,7 +4,7 @@
 
 Syndetis is a handheld Ethernet diagnostic tool for technicians. It provides quick port and addressing checks through a 128×64 OLED and three buttons. It is not a laptop replacement, network scanner or continuous monitoring appliance.
 
-**Firmware: 0.5.2. Status: RELEASE CANDIDATE — FINAL HARDWARE IMAGE CONFIRMATION PENDING.** The user reports **9/9 hardware acceptance PASS**, including ordinary OTA maintenance and non-destructive USB recovery readiness; the tested binary's exact identity was not supplied. Software checks and the final image are recorded in the [release manifest](docs/RELEASE_MANIFEST.md). No final release tag is created while that identity gate is pending.
+**Firmware: 0.5.2 — field-ready release, tag `v0.5.2`.** The user reports **9/9 hardware acceptance PASS** and confirms the final candidate was installed and passed post-flash smoke testing. Its exact local artifact hash is verified in the [release manifest](docs/RELEASE_MANIFEST.md); hardware evidence is attributed to the user, without an independent device readback. Known noncritical maintenance limitations remain documented.
 
 ## Technician workflow
 

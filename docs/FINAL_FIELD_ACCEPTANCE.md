@@ -3,7 +3,7 @@
 **Hardware acceptance: 9/9 PASS — user-reported.**
 
 Test date: **user-reported / date not recorded**. Tester: user; name not supplied.
-Board identifier, installed firmware version, binary SHA-256 and measured values: **not supplied**.
+Installed firmware: **final Syndetis v0.5.2 candidate, confirmed by the user**. Board identifier and measured values: **not supplied**.
 
 | # | User-reported test | Result |
 |---|---|---|
@@ -19,12 +19,22 @@ Board identifier, installed firmware version, binary SHA-256 and measured values
 
 These results record the user's completed session. No hardware operation was performed by the repository-cleanup agent. No additional timing, repeat count, switch model, port speed, memory margin, power-cut/rollback test or flash readback is inferred.
 
-## Final image identity gate
+## Final image confirmation and post-flash smoke test
 
-The tested device has not been tied to the final candidate binary by an exact hash or equivalent evidence. A matching version string alone is insufficient. See [release manifest](RELEASE_MANIFEST.md) for the candidate hash and source commit.
+User confirmation recorded during release finalization on **28 October 2026** (actual installation/test date not supplied):
 
-**RELEASE CANDIDATE — FINAL HARDWARE IMAGE CONFIRMATION PENDING.**
+> The final Syndetis v0.5.2 candidate was installed and passed post-flash hardware smoke testing.
 
-Update recommendation: **UNDETERMINED**. Do not flash automatically. If subsequent evidence shows the exact candidate is installed, record it and select NO FLASH NEEDED. If an older/different build is established, select FINAL FLASH REQUIRED and arrange a separately authorized update plus post-update boot/OLED/buttons/link/diagnostics smoke check. The current strictly-newer-version OTA rule rejects a different image carrying the same version; do not bypass that rule or silently change partition/boot state.
+The user identifies the previously prepared final candidate as the installed/tested artifact. Its local raw application was rehashed and matched the preserved build output byte for byte:
 
-Final release tag remains deferred until exact image identity and any required post-update smoke test are confirmed.
+- Version/product: **0.5.2 / Syndetis**.
+- Binary size: **933,440 bytes**.
+- SHA-256: `5e2a684cdda639eb8c34b97881540bbc0d963775d516135c4317b44438e10fb3`.
+- Verified firmware source commit: `53a0178293ef8e4769a7abeaeb9ca71582471799`.
+- Final candidate installation: **PASS, user-confirmed**.
+- Post-flash hardware smoke testing: **PASS, user-reported**; individual steps/measurements were not supplied.
+- Independent device flash readback: **not performed by this agent**. Artifact identity is linked to hardware by the user's explicit final-candidate confirmation, not by a newly measured device hash.
+
+**Final hardware image confirmation gate: CLOSED on user evidence plus local artifact hash verification.** Earlier 9/9 acceptance remains as reported above. No destructive recovery, power-cut testing or unreported observations are inferred.
+
+Update recommendation: **NO FLASH NEEDED** for the confirmed installed final candidate. No further update, flash, erase, reset or provisioning was performed during release finalization. Annotated release tag: **v0.5.2**; see [release manifest](RELEASE_MANIFEST.md).

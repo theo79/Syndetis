@@ -31,6 +31,6 @@ Uniform executable bits inherited by tracked data/source/recovery files were res
 
 Fetched private SSH `origin` and reviewed incoming commit `d8934dbe8729c68c76cca896673b9a1e8424684f` (0.5.1 OTA checkpoint). Local `main` was fast-forwarded from `260afc42e999845c2d670c11ce81e117920ff4ad`; no history was rewritten. Remote ignore protections and hardware-history updates were retained. Reviewed local 0.5.2 version, reliability source/tests and new field documents were restored from the protected snapshot. Current README/acceptance/manifest supersede historical milestone status statements.
 
-## Deferred
+## Release closure and retained limitations
 
-Exact installed firmware identity and any resulting authorized update/smoke test are outstanding. Final release tag is deferred. Noncritical OTA maintenance limitations remain documented; no new development milestone or features were introduced. Current generated outputs can be regenerated, but private historical backups and old firmware images must remain in the external archive.
+The earlier image-identity/tag deferral was closed by the user's subsequent confirmation that the final v0.5.2 candidate was installed and passed post-flash smoke testing, together with local artifact hash verification. Annotated release tag: v0.5.2. No further hardware operation was performed by this agent. Noncritical OTA maintenance limitations remain documented; no new development milestone or features were introduced. Current generated outputs can be regenerated, but private historical backups and old firmware images must remain in the external archive.

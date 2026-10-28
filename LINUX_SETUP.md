@@ -130,7 +130,7 @@ Monitor baud is 115200; exit with Ctrl+]. To restore the exact saved 5B image wi
 
 ## 7. Continue development
 
-Firmware 0.5.2 is feature-frozen as a release candidate. The user reports 9/9 ordinary hardware acceptance PASS; exact final image identity is pending. See docs/RELEASE_MANIFEST.md and docs/FINAL_FIELD_ACCEPTANCE.md. Destructive power-cut/rollback testing is not claimed. The historical 0.4.0 single-factory layout must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
+Firmware 0.5.2 is feature-frozen, release tag v0.5.2. The user reports 9/9 ordinary hardware acceptance PASS and confirms final-candidate installation and passing post-flash smoke testing; the local artifact hash is verified. See docs/RELEASE_MANIFEST.md and docs/FINAL_FIELD_ACCEPTANCE.md. Destructive power-cut/rollback testing is not claimed. The historical 0.4.0 single-factory layout must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
 
 Sources checked for these instructions: [official v6.1 manual Linux setup](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-macos-setup-legacy.html), [current Linux installation options](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-setup.html), [serial permissions and connection](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/establish-serial-connection.html), [official Node downloads](https://nodejs.org/en/download).
 

@@ -1,6 +1,6 @@
 # Historical extended hardware acceptance checklist
 
-Current ordinary acceptance is recorded as user-reported 9/9 PASS in [FINAL_FIELD_ACCEPTANCE.md](../FINAL_FIELD_ACCEPTANCE.md); this historical extended checklist is not retroactively marked complete. Exact final image identity remains pending.
+Current ordinary acceptance is recorded as user-reported 9/9 PASS in [FINAL_FIELD_ACCEPTANCE.md](../FINAL_FIELD_ACCEPTANCE.md); this historical extended checklist is not retroactively marked complete. The user subsequently confirmed final-candidate installation and passing post-flash smoke testing; local artifact identity is verified. This does not complete unreported extended tests below.
 
 The user confirmed successful v0.5.1 Wi-Fi browser OTA on 28 October 2026. Detailed checklist items below remain pending unless individually recorded; normal Wi-Fi success does not imply Ethernet, power-cut, rollback or runtime-margin acceptance. Record date, operator, board/flash ID, silicon revision, security state, image hashes/versions, observed result and recovery evidence for every case. No hardware PASS may be inferred from host mocks or the software build.
 

@@ -1,6 +1,6 @@
 # Milestone 6 — local browser firmware updates (v0.5.1)
 
-Historical milestone guide. Current firmware is 0.5.2; user-reported ordinary acceptance is 9/9 PASS, with exact final image identity pending. See [current manifest](../RELEASE_MANIFEST.md) and [acceptance record](../FINAL_FIELD_ACCEPTANCE.md). Earlier v0.5.1 Wi-Fi success remains historical evidence.
+Historical milestone guide. Current firmware is 0.5.2; user-reported ordinary acceptance is 9/9 PASS, and the user confirms final-candidate installation and passing post-flash smoke testing; local artifact identity is verified. See [current manifest](../RELEASE_MANIFEST.md) and [acceptance record](../FINAL_FIELD_ACCEPTANCE.md). Earlier v0.5.1 Wi-Fi success remains historical evidence.
 
 Current architecture, 28 October 2026: physical OLED authorization, temporary HTTP port 8080 and raw ESP32 application .bin uploads over Wi-Fi or Ethernet. No firmware-signing requirement, CA, certificate, passphrase, hostname mapping or device identity provisioning. Earlier signed-HTTPS plans/results are historical and do not describe this build. Production credential generation was cancelled; no production credentials were created.
 

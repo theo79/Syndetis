@@ -1,6 +1,6 @@
-# Syndetis release candidate manifest — 28 October 2026
+# Syndetis release manifest — v0.5.2
 
-**RELEASE CANDIDATE — FINAL HARDWARE IMAGE CONFIRMATION PENDING.**
+**RELEASE ACCEPTED — final v0.5.2 candidate installation and post-flash smoke PASS, user-confirmed; local artifact SHA-256 reverified.**
 
 ## Version and Git identity
 
@@ -8,7 +8,7 @@
 - Verified firmware source commit: **`53a0178293ef8e4769a7abeaeb9ca71582471799`**.
 - Reviewed remote base: `d8934dbe8729c68c76cca896673b9a1e8424684f` (0.5.1 OTA checkpoint); local history fast-forwarded before preserving the 0.5.2 reliability changes.
 - This manifest is a documentation-only successor to the firmware source commit. The candidate's exact compiled inputs were SHA-256 compared with that commit; subsequent metadata changes do not change firmware inputs. Its complete input list is also in the ignored local candidate manifest.
-- Final annotated release tag: **deliberately deferred** until exact installed-image identity and any required post-update smoke test are confirmed. No temporary or final tag was created.
+- Annotated release tag: **`v0.5.2`**, targeting the documentation-only release-finalization commit on `main`. Resolve its exact commit with `git rev-parse v0.5.2^{commit}`; the immutable firmware source commit remains the SHA above. The tag annotation records that source commit, raw image hash/size and user-reported hardware evidence.
 
 ## Toolchain and build
 
@@ -63,9 +63,15 @@ Five SDK CMake private-include dependency warnings between esp_wifi and wpa_supp
 
 **9/9 PASS, user-reported. Test date: user-reported / date not recorded.** The nine reported categories are boot/OLED/buttons, Ethernet/reconnect, LLDP/CDP, DHCP, Manual IPv4/conflict, gateway/custom Ping, repeated operations across two ports, ordinary OTA, and non-destructive USB recovery readiness. See [acceptance record](FINAL_FIELD_ACCEPTANCE.md).
 
-Exact installed firmware version, whole-file hash, device identifier and additional measurements were not supplied. The user report therefore cannot establish that this candidate binary was the tested image. No flash readback, reset, update or hardware inspection was initiated in this pass.
+Final hardware evidence, recorded during release finalization on **28 October 2026**; actual installation/test date was not supplied:
 
-**Final update/flash recommendation: UNDETERMINED.** Match the device to the exact candidate hash or equivalent trustworthy evidence first. If exact identity is established, NO FLASH NEEDED; if an older/different image is established, FINAL FLASH REQUIRED with separate update authorization and post-update smoke testing. A different same-version 0.5.2 image is rejected by the current OTA rule; do not bypass that check. No final release acceptance or annotated tag until this gate is closed.
+> The final Syndetis v0.5.2 candidate was installed and passed post-flash hardware smoke testing.
+
+This is the user's explicit confirmation that the previously prepared final candidate was installed and smoke-tested. The candidate file and preserved build output were rehashed and found byte-identical: **5e2a684cdda639eb8c34b97881540bbc0d963775d516135c4317b44438e10fb3**, **933,440 bytes**, actual descriptor **Syndetis 0.5.2 / ESP32**. All preserved package checksums, committed firmware input hashes, pinned build/partition verification and 15 recovery checksums were rechecked successfully. No rebuild or firmware changes were made; previous complete software-test results remain applicable to the unchanged inputs.
+
+Hardware identity evidence is the user's final-candidate attestation, not an independent device flash readback. No board identifier, measured timings, individual smoke-test steps, exact test date or additional hardware observations were supplied or inferred. The agent did not operate, flash, reset, erase or provision the device.
+
+**Final update/flash recommendation: NO FLASH NEEDED** for the confirmed installed final candidate. The hardware-image and required post-flash smoke gates are closed on the evidence above; annotated release tag **v0.5.2** is authorized.
 
 USB recovery readiness is user-reported PASS and all stored recovery checksums pass. This does not claim a destructive recovery or power-cut/rollback exercise.
 
@@ -79,7 +85,7 @@ Preserved as requested, without adding features or redesigning OTA:
 - Wired link/address changes invalidate a Wi-Fi-only update reservation too; wired initialization must succeed to reserve maintenance. Keep the connection stable during maintenance.
 - HTTP provides no encryption or cryptographic firmware authentication. Physical authorization/local subnet filtering and ESP checksums do not authenticate firmware authorship. Use trusted images on a controlled local connection.
 
-No confirmed unresolved defect blocking ordinary portable diagnostics was found in this pass. Electrical fault injection, measured runtime margins and destructive rollback testing are not inferred from the nine aggregate PASS results. The outstanding final-release blocker is exact hardware image confirmation and any resulting update/smoke test.
+No confirmed unresolved defect blocking ordinary portable diagnostics was found in this pass. Electrical fault injection, measured runtime margins and destructive rollback testing are not inferred from the nine aggregate PASS results. The final hardware-image and post-flash smoke gates are closed by the explicit user evidence above. No remaining blocker is identified for the intended portable diagnostic role; the noncritical maintenance limitations remain accepted and documented.
 
 ## Cleanup, artifacts and GitHub synchronization
 
@@ -87,8 +93,8 @@ No confirmed unresolved defect blocking ordinary portable diagnostics was found 
 
 Active structure: `main/`, `scripts/`, `tests/`, `docs/`, `recovery/`, root CMake/configuration/lockfiles; ignored `build-final/`, `tmp/`, `releases/`, `managed_components/` and `node_modules/` are local development outputs/dependencies. No large archive was added inside the repository.
 
-Local candidate package: `releases/v0.5.2-candidate/`, containing raw application, `manifest.json`, `verification.json`, offline `image-info.txt` and `SHA256SUMS.txt`. Its firmware copy exactly matches `build-final/Syndetis.bin`; every package checksum is verified. These generated binaries remain excluded from GitHub. Required source and supporting tools/tests are committed; this is not a GitHub Release upload.
+Local final package: `releases/v0.5.2/`, containing the unchanged raw application `Syndetis-v0.5.2.bin`, release `manifest.json`, software `verification.json`, offline `image-info.txt` and `SHA256SUMS.txt`. Its firmware is byte-identical to `releases/v0.5.2-candidate/Syndetis-v0.5.2.bin` and `build-final/Syndetis.bin`. The original candidate package is preserved intact. The software verifier's `hardware_validated: false` denotes that the automated verifier does not exercise hardware; user-reported hardware acceptance is recorded separately here and in the release JSON. Every package checksum is verified. Generated binaries remain excluded from GitHub; this is a source/tag publication, not a GitHub Release asset upload.
 
-GitHub source synchronization: **PASS** — firmware source commit `53a0178293ef8e4769a7abeaeb9ca71582471799` was pushed by SSH to the existing **PRIVATE** `git@github.com:theo79/Syndetis.git`, branch `main`, and confirmed by `git ls-remote`. This manifest is a metadata-only successor; final main/HEAD equality is checked after its separate normal push. No other branch, tag, visibility or history changes are requested. Exact final documentation commit is available from Git history rather than a self-referential hash in this file.
+GitHub publication target: existing **PRIVATE** `git@github.com:theo79/Syndetis.git`, branch `main` and annotated tag **v0.5.2**, using configured SSH. Firmware source commit `53a0178293ef8e4769a7abeaeb9ca71582471799` and preceding manifest commit `7a5a2639936e7aa88d53af41f14d93af92ce3b5b` were already synchronized. The release-finalization commit and annotated tag are published together by a normal atomic push; live remote `main`, tag object and peeled tag commit are verified against the local references afterward. The exact final commit is resolved by the tag, avoiding a self-referential commit hash inside this document. No visibility change, force-push or history rewrite is performed.
 
 **Syndetis is feature-frozen for its intended portable Ethernet diagnostic role. Future changes require a demonstrated technician need or a confirmed reliability defect.**
