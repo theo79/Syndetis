@@ -18,3 +18,6 @@ void discovery_receive(const uint8_t *buffer, size_t length);
 discovery_summary_t discovery_summary(void);
 bool discovery_record(int index, neighbor_t *out);
 bool discovery_snapshot(neighbor_table_t *out);
+
+// Startup handshake, independent of receiving advertisements or link state.
+bool discovery_worker_started(void);

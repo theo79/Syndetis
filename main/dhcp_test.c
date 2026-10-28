@@ -42,6 +42,11 @@ static bool manual_watch, watch_probing;
 static uint32_t watch_ip;
 static unsigned watch_session;
 static bool ping_reserved, ping_window;
+static bool update_reserved;
+static unsigned update_generation;
+static uint64_t worker_heartbeat;
+static uint64_t update_deadline;
+static uint32_t update_local, update_mask;
 static unsigned ping_generation;
 static uint32_t ping_local, ping_target;
 static uint16_t ping_id, ping_sequence;
@@ -108,6 +113,10 @@ static esp_err_t transmit(void *handle, void *buffer, size_t length)
         enabled = ping_reserved && ping_window && ping_generation == address_generation &&
                   state.active && !state.busy && pending == CMD_NONE &&
                   ping_frame_match(f, length, ping_local, ping_target, ping_id, ping_sequence, ping_cookie, false);
+    if (enabled && f && length >= 34 && f[12] == 8 && f[13] == 0 && f[23] == 6) {
+        enabled=update_reserved && update_generation==address_generation &&
+            clock_ms()<update_deadline && update_http_frame(f,length,update_local,update_mask,false);
+    }
     portEXIT_CRITICAL(&lock);
     return enabled ? esp_eth_transmit(handle, buffer, length) : ESP_ERR_INVALID_STATE;
 }
@@ -136,7 +145,9 @@ bool dhcp_test_receive(uint8_t *buffer, uint32_t length)
                 ping_frame_match(buffer, length, ping_target, ping_local, ping_id, ping_sequence, ping_cookie, true);
     if (echo && !ping_arrival_us) ping_arrival_us = (uint64_t)esp_timer_get_time();
     // A late DHCP datagram must never reach the client in Manual mode.
-    bool accept = rx_enabled && link_up && (echo || (ordinary &&
+    bool tls = update_reserved && update_generation == address_generation && clock_ms()<update_deadline &&
+               state.active && !state.busy && update_http_frame(buffer,length,update_local,update_mask,true);
+    bool accept = rx_enabled && link_up && (tls || echo || (ordinary &&
                   (!manual_watch || (buffer[12] == 8 && buffer[13] == 6))));
     if (accept) ++inflight;
     portEXIT_CRITICAL(&lock);
@@ -226,7 +237,7 @@ bool dhcp_test_request(bool start)
 {
     uint64_t now = clock_ms();
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && (start ? pending == CMD_NONE && !state.busy :
+    bool ok = initialized && !ping_reserved && !update_reserved && (start ? pending == CMD_NONE && !state.busy :
                               pending != CMD_STOP && pending != CMD_CANCEL &&
                               (!state.busy || state.state == DHCP_REQUESTING));
     ok = ok && state.mode != WIRED_MANUAL && state.state != MANUAL_PROBING;
@@ -290,6 +301,7 @@ const char *wired_manual_apply(const manual_ipv4_t *config, unsigned review_gene
     uint64_t now = clock_ms();
     portENTER_CRITICAL(&lock);
     const char *error = !initialized ? "Ethernet unavailable" : !link_up ? "Connect Ethernet" :
+        update_reserved ? "Firmware update active" :
         ping_reserved ? "Ping active: cancel" :
         review_generation != address_generation ? "Changed: review again" :
         state.cleanup_error ? "Retry Stop / Release" :
@@ -329,7 +341,7 @@ bool wired_manual_cancel(void)
 bool wired_use_dhcp(void)
 {
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && pending == CMD_NONE && !state.busy;
+    bool ok = initialized && !ping_reserved && !update_reserved && pending == CMD_NONE && !state.busy;
     if (ok) {
         pending = CMD_STOP;
         manual_watch = false;
@@ -341,6 +353,46 @@ bool wired_use_dhcp(void)
     }
     portEXIT_CRITICAL(&lock);
     return ok;
+}
+
+static uint32_t address_value(const char *p)
+{
+    uint32_t result=0;
+    for(unsigned i=0;i<4;++i) {
+        unsigned n=0;
+        while(*p>='0' && *p<='9') n=n*10+(unsigned)(*p++-'0');
+        if(n>255 || (i<3 ? *p!='.' : *p!=0)) return 0;
+        if(i<3)++p;
+        result=(result<<8)|n;
+    }
+    return result;
+}
+bool wired_update_reserve(unsigned *generation)
+{
+    portENTER_CRITICAL(&lock);
+    bool ok=initialized && !update_reserved && !ping_reserved && pending==CMD_NONE &&
+        !state.busy && !state.cleanup_error && state.state!=DHCP_REQUESTING && state.state!=MANUAL_PROBING;
+    if(ok) {
+        update_reserved=true;update_generation=address_generation;*generation=address_generation;
+        update_local=address_value(state.ip);update_mask=address_value(state.mask);
+        update_deadline=clock_ms()+180000;
+    }
+    portEXIT_CRITICAL(&lock);return ok;
+}
+bool wired_update_valid(unsigned generation)
+{
+    portENTER_CRITICAL(&lock);
+    bool ok=update_reserved && generation==address_generation && generation==update_generation &&
+        !state.busy && !state.cleanup_error && clock_ms()<update_deadline;
+    portEXIT_CRITICAL(&lock);return ok;
+}
+void wired_update_extend(void)
+{
+    portENTER_CRITICAL(&lock);if(update_reserved)update_deadline=clock_ms()+600000;portEXIT_CRITICAL(&lock);
+}
+void wired_update_release(void)
+{
+    portENTER_CRITICAL(&lock);update_reserved=false;update_local=update_mask=0;portEXIT_CRITICAL(&lock);
 }
 
 static void ip_text(char out[16], esp_ip4_addr_t ip)
@@ -358,7 +410,7 @@ static bool ping_valid_locked(unsigned generation)
 bool wired_ping_reserve(dhcp_status_t *snapshot)
 {
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && link_up && state.active && !state.busy &&
+    bool ok = initialized && !ping_reserved && !update_reserved && link_up && state.active && !state.busy &&
               !state.cleanup_error && pending == CMD_NONE && rx_enabled && tx_enabled;
     if (ok) {
         ping_reserved = true; ping_window = false; ping_generation = address_generation;
@@ -599,7 +651,11 @@ publish:
 static void worker(void *arg)
 {
     (void)arg;
-    for (;;) { worker_step(); network_ping_step(); vTaskDelay(pdMS_TO_TICKS(50)); }
+    for (;;) {
+        worker_step(); network_ping_step();
+        portENTER_CRITICAL(&lock);worker_heartbeat=clock_ms();portEXIT_CRITICAL(&lock);
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
 }
 
 esp_err_t dhcp_test_init(esp_eth_handle_t driver, const uint8_t mac[6])
@@ -630,4 +686,11 @@ esp_err_t dhcp_test_init(esp_eth_handle_t driver, const uint8_t mac[6])
     portEXIT_CRITICAL(&lock);
     if (err != ESP_OK) ESP_LOGE("dhcp", "DHCP test setup: %s (0x%x)", esp_err_to_name(err), (unsigned)err);
     return err;
+}
+
+bool wired_worker_healthy(void)
+{
+    portENTER_CRITICAL(&lock);
+    bool ok=initialized && worker_heartbeat && clock_ms()-worker_heartbeat<1000;
+    portEXIT_CRITICAL(&lock);return ok;
 }

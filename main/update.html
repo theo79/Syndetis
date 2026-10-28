@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Syndetis Firmware Update</title><style>
+body{font:16px system-ui,sans-serif;max-width:36rem;margin:auto;padding:1rem;background:#111923;color:#edf5ff}h1{font-size:1.5rem}label{display:block;margin:1rem 0 .3rem}input,button{font:inherit;max-width:100%;box-sizing:border-box}input{padding:.6rem}button{padding:.7rem;margin:.5rem .3rem .5rem 0}progress{width:100%}#status{white-space:pre-wrap;overflow-wrap:anywhere}small{display:block;color:#bdcddd}
+</style><h1>Syndetis Firmware Update</h1>
+<p>Keep the device powered. Use a Syndetis application <strong>.bin</strong> file. Your current firmware stays available if the update fails.</p>
+<small>Open Settings → Firmware Update on the device. Local HTTP is not encrypted and firmware is not signature-authenticated.</small>
+<form id="form"><label for="file">Firmware .bin</label><input id="file" type="file" accept=".bin,application/octet-stream" required>
+<p><button id="upload" type="submit">Upload and update</button><button id="cancel" type="button">Cancel session</button></p></form>
+<progress id="progress" max="100" value="0"></progress><p id="status" role="status">Select an application .bin.</p>
+<small>After verification the device reboots. Reopen its dashboard and check the firmware version. If the new firmware cannot pass its startup checks, the previous version returns.</small>
+<script>
+'use strict';
+const byId=id=>document.getElementById(id);
+let request=null,finished=false;
+const tell=text=>{byId('status').textContent=text;};
+function busy(active){byId('upload').disabled=active;byId('file').disabled=active;}
+byId('form').addEventListener('submit',event=>{
+ event.preventDefault();if(request||finished)return;
+ const file=byId('file').files[0];if(!file){tell('Select an application .bin.');return;}
+ if(!/\.bin$/i.test(file.name)){tell('Choose an application .bin file.');return;}
+ const xhr=new XMLHttpRequest();request=xhr;busy(true);tell('Uploading. Keep power connected.');
+ xhr.open('POST','/update/upload');xhr.timeout=610000;
+ xhr.setRequestHeader('Content-Type','application/octet-stream');
+ xhr.upload.onprogress=e=>{if(e.lengthComputable){byId('progress').value=e.loaded/e.total*100;tell(e.loaded===e.total?'Upload sent; verifying firmware…':'Uploading: '+Math.floor(e.loaded/e.total*100)+'%');}};
+ xhr.onload=()=>{request=null;finished=xhr.status===200;tell(finished?'Verified. Device is rebooting; check its firmware version after reconnecting.':xhr.responseText||'Update rejected. Reopen Firmware Update on the OLED.');busy(finished);};
+ const failed=()=>{request=null;busy(false);tell('Connection interrupted. Do not assume the update succeeded. Check OLED and firmware version before reopening a session.');};
+ xhr.onerror=failed;xhr.ontimeout=failed;xhr.onabort=failed;xhr.send(file);
+});
+byId('cancel').addEventListener('click',async()=>{
+ if(finished)return;
+ try{const r=await fetch('/update/cancel',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store'});
+ if(!r.ok)throw Error();if(request)request.abort();finished=true;busy(true);tell('Session cancelled. Reopen Firmware Update on the device to retry.');
+ }catch{tell('Could not confirm cancellation. Hold OK on the device to cancel; a verified update may already be rebooting.');}
+});
+</script></html>

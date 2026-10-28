@@ -11,3 +11,17 @@ __pycache__/
 *.key
 *.pcap
 *.pcapng
+
+# Local device identity and signing material must never enter Git.
+/provisioning/
+*.pem
+
+# Local development environments, private archives and generated release material.
+/.venv/
+/venv/
+/releases/
+/backups/
+/syndetis-secrets/
+*.log
+*.p12
+*.pfx

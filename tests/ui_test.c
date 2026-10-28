@@ -8,6 +8,14 @@
 #include "../main/ui.c"
 #define CHECK(x) do { if(!(x)){fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x);exit(1);} } while(0)
 static app_status_t fixture;
+static char frame_text[4096];
+static int progress_fill;
+static ota_update_status_t update_fixture;
+static unsigned update_opens,update_cancels;
+ota_update_status_t ota_update_status(void){return update_fixture;}
+bool ota_update_request_session(void){++update_opens;return true;}
+void ota_update_cancel(void){++update_cancels;}
+
 static neighbor_t fixture_neighbor;
 static bool have_neighbor;
 static int enables, disables;
@@ -46,12 +54,14 @@ discovery_summary_t discovery_summary(void) {
 bool discovery_record(int index,neighbor_t *out) {
     if(index!=0||!have_neighbor)return false;*out=fixture_neighbor;return true;
 }
-void display_clear(void) {}
+void display_clear(void) {frame_text[0]=0;progress_fill=0;}
 uint8_t display_address(void) { return 0x3c; }
 void display_rect(int x,int y,int w,int h,bool filled,bool on) {
-    (void)filled;(void)on;CHECK(x>=0&&y>=0&&x+w<=128&&y+h<=64);
+    if(filled&&x==4&&y==34&&h==6)progress_fill=w;
+    (void)on;CHECK(x>=0&&y>=0&&x+w<=128&&y+h<=64);
 }
 void display_text(int x,int y,const char *s,int scale,bool on) {
+    if(strlen(frame_text)+strlen(s)+2<sizeof(frame_text)){strcat(frame_text,s);strcat(frame_text,"\n");}
     (void)on;CHECK(x>=0&&y>=0&&y+7*scale<=64);
     CHECK(x+(int)strlen(s)*6*scale-scale<=128);
 }
@@ -59,6 +69,33 @@ void display_text(int x,int y,const char *s,int scale,bool on) {
 int main(void)
 {
     fixture.ethernet.state=ETH_READY;fixture.web.state=WEB_OFF;
+    ui_init();selection=6;ui_input(BUTTON_OK);CHECK(page==SETTINGS);
+    ui_input(BUTTON_OK);CHECK(page==UPDATE_DETAILS&&update_opens==1);
+    update_fixture.state=OTA_AUTHORIZED;
+    strcpy(update_fixture.message,"Update mode active");
+    dhcp_fixture.active=true;strcpy(dhcp_fixture.ip,"198.51.100.10");
+    information_lines(&fixture);bool host_found=false,ip_found=false;
+    for(int row=0;row<line_count;++row){
+        host_found|=strstr(lines[row],"http://")!=NULL;ip_found|=strstr(lines[row],":8080")!=NULL;
+        top=row;ui_draw();
+    }
+    CHECK(host_found&&ip_found);dhcp_fixture.active=false;
+    update_fixture.state=OTA_RECEIVING;update_fixture.total=640;update_fixture.received=0;
+    strcpy(update_fixture.message,"Preparing update...");ui_draw();
+    CHECK(strstr(frame_text,"Preparing update...")&&!ui_refresh_needed()&&progress_fill==0);
+    update_fixture.received=639;strcpy(update_fixture.message,"Receiving application");
+    CHECK(ota_update_percent(&update_fixture)==99&&ui_refresh_needed());ui_draw();
+    CHECK(strstr(frame_text,"Uploading 99%")&&!strstr(frame_text,"100%")&&!ui_refresh_needed()&&progress_fill==118);
+    update_fixture.received=640;CHECK(ota_update_percent(&update_fixture)==100);
+    strcpy(update_fixture.message,"Verifying...");ui_draw();CHECK(strstr(frame_text,"Verifying...")&&progress_fill==120);
+    update_fixture.state=OTA_READY;ui_draw();CHECK(strstr(frame_text,"Update complete")&&strstr(frame_text,"Rebooting..."));
+    update_fixture.state=OTA_FAILED;strcpy(update_fixture.message,"ESP image validation failed");ui_draw();CHECK(strstr(frame_text,"Invalid image"));
+    update_fixture.state=OTA_CANCELLED;strcpy(update_fixture.message,"Cancelled");ui_draw();CHECK(strstr(frame_text,"Cancelled"));
+    update_fixture.total=0;CHECK(ota_update_percent(&update_fixture)==0);
+
+    ui_input(BUTTON_BACK);CHECK(page==SETTINGS&&update_cancels==1);
+    ui_draw();ui_input(BUTTON_BACK);CHECK(page==MENU);
+
     ui_init();selection=4;ui_input(BUTTON_BACK);CHECK(page==MENU&&selection==4);
     ui_input(BUTTON_OK);CHECK(page==WEB_MENU);
     ui_input(BUTTON_BACK);CHECK(page==MENU&&enables==0&&disables==0);

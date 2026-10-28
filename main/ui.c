@@ -8,6 +8,8 @@
 #include "discovery.h"
 #include "dhcp_test.h"
 #include "network_ping.h"
+#include "ota_update.h"
+#include "ota_http_policy.h"
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -20,12 +22,13 @@
 #include "esp_timer.h"
 
 enum { MENU, LINK_INFO, SWITCH_MENU, SWITCH_STATUS, SWITCH_NEIGHBOR, DEVICE_INFO, WEB_MENU, WEB_DETAILS, ABOUT, TESTS_MENU, DHCP_MENU, DHCP_RESULTS,
-       MANUAL_MENU, MANUAL_IP_EDIT, MANUAL_PREFIX_EDIT, MANUAL_GATEWAY_EDIT, MANUAL_GATEWAY_MENU, MANUAL_REVIEW, MANUAL_RESULTS,
+       SETTINGS, UPDATE_DETAILS, MANUAL_MENU, MANUAL_IP_EDIT, MANUAL_PREFIX_EDIT, MANUAL_GATEWAY_EDIT, MANUAL_GATEWAY_MENU, MANUAL_REVIEW, MANUAL_RESULTS,
        PING_MENU, PING_NO_IP, PING_CUSTOM, PING_REVIEW, PING_RESULTS };
 static int page, selection, web_selection, switch_selection, neighbor_index, top;
 static char lines[128][21];
 static int line_count;
 static int tests_selection, dhcp_selection;
+static int settings_selection;
 static manual_ipv4_t draft;
 static int manual_selection, gateway_selection, edit_octet, review_selection;
 static unsigned review_generation;
@@ -273,7 +276,22 @@ static int web_items(const web_status_t *web, const char **items)
 
 static void information_lines(const app_status_t *status)
 {
-    if (page == DEVICE_INFO) device_lines();
+    if (page == UPDATE_DETAILS) {
+        ota_update_status_t u=ota_update_status();line_count=0;
+        add_line("Firmware Update");add_line("%s",ota_state_name(u.state));add_line("%s",u.message);
+        if(u.state==OTA_AUTHORIZED) {
+            add_line("Update mode active");
+            add_line("Wi-Fi: %s",status->web.ssid);add_line("Password:");add_line("%s",WEB_AP_PASSWORD);
+            add_line("http://192.168.4.1:8080/update");
+            dhcp_status_t d=dhcp_test_status();
+            if(d.active) {add_line("Ethernet URL:");add_line("http://%s:8080/update",d.ip);}
+            else {add_line("Ethernet: set Manual");add_line("IP or DHCP first");}
+            add_line("Use application .bin");add_line("Local HTTP: no");add_line("encryption/signature");
+        }
+        if(u.total)add_line("Received: %u%%",(unsigned)(u.received*100/u.total));
+        add_line("UP/DOWN: scroll");add_line("OK / hold: cancel");
+    }
+    else if (page == DEVICE_INFO) device_lines();
     else if (page == LINK_INFO) link_lines(&status->ethernet);
     else if (page == SWITCH_STATUS || page == SWITCH_NEIGHBOR) switch_lines();
     else if (page == WEB_DETAILS) web_lines(&status->web);
@@ -439,6 +457,16 @@ static void ping_input(uint8_t buttons)
 void ui_input(uint8_t buttons)
 {
     app_status_t status = status_get();
+    if(page==SETTINGS) {
+        if(buttons & BUTTON_BACK || (buttons==BUTTON_OK && settings_selection==1)) {page=MENU;return;}
+        if(buttons==BUTTON_UP)settings_selection=0;
+        if(buttons==BUTTON_DOWN)settings_selection=1;
+        if(buttons==BUTTON_OK && settings_selection==0) {ota_update_request_session();page=UPDATE_DETAILS;top=0;}
+        return;
+    }
+    if(page==UPDATE_DETAILS && (buttons & BUTTON_BACK || buttons==BUTTON_OK)) {
+        ota_update_cancel();page=SETTINGS;top=0;return;
+    }
     if (page >= PING_MENU) { ping_input(buttons); return; }
     if (page >= MANUAL_MENU) { manual_input(buttons); return; }
     if (buttons & (BUTTON_UP_REPEAT | BUTTON_DOWN_REPEAT)) return;
@@ -456,11 +484,12 @@ void ui_input(uint8_t buttons)
     }
     if (page == MENU) {
         if (buttons == BUTTON_UP && selection > 0) --selection;
-        if (buttons == BUTTON_DOWN && selection < 5) ++selection;
+        if (buttons == BUTTON_DOWN && selection < 6) ++selection;
         if (buttons == BUTTON_OK) {
-            const int pages[] = {LINK_INFO, SWITCH_MENU, TESTS_MENU, DEVICE_INFO, WEB_MENU, ABOUT};
+            const int pages[] = {LINK_INFO, SWITCH_MENU, TESTS_MENU, DEVICE_INFO, WEB_MENU, ABOUT, SETTINGS};
             page = pages[selection];
             top = 0;
+            if (page == SETTINGS) settings_selection = 0;
             if (page == WEB_MENU) web_selection = 0;
             if (page == SWITCH_MENU) switch_selection = 0;
             if (page == TESTS_MENU) tests_selection = 0;
@@ -665,6 +694,42 @@ static void manual_draw(void)
     }
 }
 
+static bool progress_frame_valid;
+static ota_state_t progress_frame_state;
+static unsigned progress_frame_percent;
+static char progress_frame_message[96];
+static bool progress_page(const ota_update_status_t *u)
+{
+    return page==UPDATE_DETAILS && (u->state==OTA_RECEIVING || u->state==OTA_VALIDATING ||
+        u->state==OTA_READY || u->state==OTA_FAILED || u->state==OTA_CANCELLED);
+}
+bool ui_refresh_needed(void)
+{
+    ota_update_status_t u=ota_update_status();
+    if(!progress_page(&u))return true;
+    return !progress_frame_valid || u.state!=progress_frame_state ||
+        ota_update_percent(&u)!=progress_frame_percent || strcmp(u.message,progress_frame_message);
+}
+static void draw_update_progress(const ota_update_status_t *u)
+{
+    unsigned percent=ota_update_percent(u);char label[24];
+    if(u->state==OTA_FAILED || u->state==OTA_CANCELLED) {
+        display_text(2,18,u->state==OTA_FAILED?"Update failed":"Cancelled",1,true);
+        const char *reason=strstr(u->message,"validation")?"Invalid image":u->message;
+        snprintf(label,sizeof(label),"%.20s",reason);display_text(2,34,label,1,true);
+        display_text(2,50,"OK: back",1,true);
+    } else {
+        if(u->state==OTA_READY)snprintf(label,sizeof(label),"Update complete");
+        else if(u->state==OTA_VALIDATING || !strcmp(u->message,"Verifying..."))snprintf(label,sizeof(label),"Verifying...");
+        else if(!u->received)snprintf(label,sizeof(label),"Preparing update...");
+        else snprintf(label,sizeof(label),"Uploading %u%%",percent);
+        display_text(2,18,label,1,true);display_rect(2,32,124,10,false,true);
+        if(percent)display_rect(4,34,(int)(120u*percent/100u),6,true,true);
+        display_text(2,50,u->state==OTA_READY?"Rebooting...":"OK / hold: cancel",1,true);
+    }
+    progress_frame_valid=true;progress_frame_state=u->state;progress_frame_percent=percent;
+    snprintf(progress_frame_message,sizeof(progress_frame_message),"%s",u->message);
+}
 void ui_draw(void)
 {
     app_status_t status = status_get();
@@ -678,14 +743,25 @@ void ui_draw(void)
         display_text(86, 2, "WEB ON", 1, false);
     else if (status.web.state == WEB_ERROR) display_text(86, 2, "WEB ER", 1, false);
     else if (status.web.state == WEB_STARTING) display_text(86, 2, "WEB ..", 1, false);
-    if (page >= PING_MENU) ping_draw();
+    ota_update_status_t update=ota_update_status();
+    if(progress_page(&update)) {draw_update_progress(&update);return;}
+    progress_frame_valid=false;
+    if(page==SETTINGS) {
+        const char *items[]={"Firmware Update","Back"};
+        for(int i=0;i<2;++i) {
+            bool selected=settings_selection==i;
+            if(selected)display_rect(0,16+12*i,123,12,true,true);
+            display_text(3,18+12*i,items[i],1,!selected);
+        }
+    }
+    else if (page >= PING_MENU) ping_draw();
     else if (page >= MANUAL_MENU && page != MANUAL_RESULTS) manual_draw();
     else if (page == MENU || page == WEB_MENU || page == TESTS_MENU || page == DHCP_MENU) {
-        const char *main_items[] = {"Link & IP", "Switch Info", "Network Tests", "Device Info", "Web Access", "About"};
+        const char *main_items[] = {"Link & IP", "Switch Info", "Network Tests", "Device Info", "Web Access", "About", "Settings"};
         const char *web_menu_items[3];
         const char *tests_items[] = {"DHCP Test", "Manual IP", "PING", "Back"};
         const char *dhcp_items[] = {"Start", "Status / Results", "Stop / Release", "Back"};
-        int count = page == MENU ? 6 : page == TESTS_MENU ? 4 : page == DHCP_MENU ? 4 : web_items(&status.web, web_menu_items);
+        int count = page == MENU ? 7 : page == TESTS_MENU ? 4 : page == DHCP_MENU ? 4 : web_items(&status.web, web_menu_items);
         if (web_selection >= count) web_selection = count - 1;
         int selected_index = page == MENU ? selection : page == TESTS_MENU ? tests_selection : page == DHCP_MENU ? dhcp_selection : web_selection;
         int first = selected_index >= 4 ? selected_index - 3 : 0;

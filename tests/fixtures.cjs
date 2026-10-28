@@ -1,6 +1,6 @@
 // Synthetic test-only API data; never compiled into firmware.
 exports.status = (down = false, expired = false) => ({
-  firmware: '0.4.0', uptime_seconds: 3661,
+  firmware: '0.5.0', uptime_seconds: 3661,
   dhcp: {state:'IPv4 off / passive',requesting:false,active:false,busy:false,cleanup_error:false,duration_ms:0,ip:null,mask:null,gateway:null,dns:[null,null],error_code:0,error_step:null},
   ethernet: {initialization: 'Ready', error_code: 0, error_step: '',
     link: down ? 'Down' : 'Up', speed_mbps: down ? null : 100,

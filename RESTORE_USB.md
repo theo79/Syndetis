@@ -1,5 +1,7 @@
 # USB restore — saved firmware images
 
+For the **new 0.5.0 dual-slot layout**, see [Milestone 6 migration and recovery](docs/milestone6/README.md). These saved-image instructions restore the historical factory layout. Never mix its old table/app offsets with the new OTA artifacts. Restoring an old application and table is distinct from erasing device-specific NVS; keep the dedicated new identity partition backed up.
+
 No restore or flash was performed during packaging. Use 3.3 V UART logic, adapter TX to RX0, RX to TX0 and common ground. Supply adequate board power. Hold GPIO0 LOW while resetting/powering the board for the ROM loader. After programming, release GPIO0 and reset for normal operation. GPIO16 is the oscillator enable, not PHY reset; do not change the GPIO mapping.
 
 ## Choose the intended image

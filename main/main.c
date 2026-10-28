@@ -3,6 +3,7 @@
 #include "display.h"
 #include "ui.h"
 #include "services.h"
+#include "ota_update.h"
 #include <inttypes.h>
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -13,6 +14,7 @@ static int64_t now_ms(void) { return esp_timer_get_time() / 1000; }
 
 void app_main(void)
 {
+    ota_update_start(); // Trial watchdog also covers early display/UI initialization failure.
     buttons_init();
     esp_err_t err = display_init();
     if (err != ESP_OK) {
@@ -48,9 +50,13 @@ void app_main(void)
         buttons_set_repeat(ui_editing());
         uint8_t pressed = buttons_poll(now);
         if (pressed) ui_input(pressed);
-        if (pressed || now - last_refresh >= 250) {
-            ui_draw();
-            ESP_ERROR_CHECK(display_present());
+        if ((pressed || now - last_refresh >= 250) && ota_update_ui_begin()) {
+            if(pressed || ui_refresh_needed()) {
+                ui_draw();
+                ESP_ERROR_CHECK(display_present());
+                ota_update_health_frame(services_boot_healthy());
+            }
+            ota_update_ui_end();
             last_refresh = now_ms();
         }
         vTaskDelay(pdMS_TO_TICKS(10));

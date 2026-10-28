@@ -1,4 +1,6 @@
-# Checkpoint verification
+# Checkpoint verification — historical 0.4.0
+
+Current Milestone 6 development verification is recorded in [milestone6/RESULTS.md](milestone6/RESULTS.md). The statements below describe the preserved pre-OTA checkpoint, not the current partition/configuration.
 
 Verified 2026-10-27. A fresh build from this standalone directory passed with official ESP-IDF v6.1, ESP32 and the locked LAN87xx dependency. Effective Kconfig matches the accepted source configuration; the generated partition table is byte-identical to the saved 5B table. All 40 firmware/component inputs match after LF normalization.
 

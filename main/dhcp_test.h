@@ -46,3 +46,11 @@ bool wired_ping_binding(unsigned generation, wired_ping_binding_t *binding);
 void wired_ping_expect(unsigned generation, uint32_t target, uint16_t id, uint16_t sequence, uint64_t cookie);
 void wired_ping_release(void);
 uint64_t wired_ping_reply_time(unsigned generation);
+// Maintenance owns the current address without changing it. Wi-Fi-only sessions
+// can reserve while wired IPv4 is off. New diagnostic mutations are excluded.
+bool wired_update_reserve(unsigned *generation);
+bool wired_update_valid(unsigned generation);
+void wired_update_extend(void);
+void wired_update_release(void);
+
+bool wired_worker_healthy(void);

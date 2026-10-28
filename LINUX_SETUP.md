@@ -1,6 +1,6 @@
-# Linux setup — Syndetis5C
+# Linux setup — Syndetis Milestone 6
 
-This is the unchanged Milestone 5B application, version **0.4.0**, for ESP32 / WT32-ETH01. Checkpoint name: Syndetis5C. No Windows object files, installed tools or parent source tree are needed. Internet is needed for initial SDK/tool/component/browser installation.
+This is the Milestone 6 development application, version **0.5.1**, for ESP32 / WT32-ETH01. The validated 0.4.0 checkpoint/recovery bytes are preserved. **Do not flash the new layout over a deployed unit before the [migration checklist](docs/milestone6/README.md) is approved.** No Windows object files, installed tools or parent source tree are needed. Internet is needed for initial SDK/tool/component/browser installation.
 
 ## 1. OS prerequisites
 
@@ -45,16 +45,16 @@ Expect ESP-IDF v6.1. Activate `. "$HOME/esp/esp-idf-v6.1/export.sh"` in every ne
 Authenticate to GitHub using your normal credential manager or SSH setup. Keep tokens out of URLs and files.
 
 ```bash
-git clone --branch syndetis-5c https://github.com/theo79/Syndetis.git
-cd Syndetis/Syndetis5C
-python3 scripts/verify_checksums.py
-idf.py build
-python3 scripts/verify_build.py
+git clone --branch main https://github.com/theo79/Syndetis.git
+cd Syndetis
+python3 scripts/verify_checksums.py --manifest recovery/SHA256SUMS.txt
+idf.py -B build-m6 build
+python3 scripts/verify_build.py build-m6
 ```
 
-CMake requires the exact SDK commit and ESP32 target. It initializes `build/sdkconfig` from the reviewed complete `sdkconfig.pinned`; defaults alone are not relied on to recreate omitted settings. The effective configuration must match every recorded CONFIG option. The existing SDK `partitions_singleapp.csv` selection stays unchanged. The checked-in `partitions.csv` records its exact layout; `verify_build.py` verifies the generated binary against the saved factory table.
+CMake requires the exact SDK commit and ESP32 target. It initializes `build/sdkconfig` from the reviewed complete `sdkconfig.pinned`; defaults alone are not relied on to recreate omitted settings. The effective configuration must match every recorded CONFIG option. The custom `partitions.csv` selects dual OTA slots and an unused reserved legacy NVS partition. `verify_build.py` checks the complete new layout, rollback/security settings, app size and bootloader fit. Old build directories retain their own generated sdkconfig; always use a fresh build-m6 directory when moving from 0.4.0.
 
-The component manager downloads **espressif/lan87xx 1.1.0** using `main/idf_component.yml` and `dependencies.lock`. `managed_components/` is generated locally; it is not copied from the old project. Expected output: `build/Syndetis.bin`, with a 1 MiB factory application limit. Build timestamps, paths and ELF hashes can change binary bytes; compare configurations/layout/source and record your new hash rather than expecting byte identity.
+The component manager downloads **espressif/lan87xx 1.1.0** using `main/idf_component.yml` and `dependencies.lock`. `managed_components/` is generated locally; it is not copied from the old project. Expected output: `build-m6/Syndetis.bin`, with two 1,966,080-byte application slots. Upload the raw application .bin without a signed trailer; no identity provisioning is required. Build timestamps, paths and ELF hashes can change binary bytes; compare configurations/layout/source and record your new hash rather than expecting byte identity.
 
 For a second genuinely fresh build without deleting the first:
 
@@ -94,7 +94,7 @@ npx playwright install --with-deps chromium
 python3 scripts/run_tests.py
 ```
 
-The runner builds eight actual-C suites, runs JSON/dashboard tests, then Playwright Chromium. It chooses the bundled browser by default; set `BROWSER_CHANNEL=chrome` only when using an installed Google Chrome. `python3 scripts/run_tests.py --skip-browser` explicitly skips browser coverage and must not be reported as a complete run. Browser data are synthetic. Outputs stay under ignored `tmp/`.
+The runner builds eleven actual-C suites, runs signing/provisioning validation and JSON/dashboard Node tests, then existing dashboard and new update-page Playwright scenarios. Host Python needs the cryptography package (already provided by the SDK Python environment); use that interpreter if the OS Python lacks it. It chooses the bundled browser by default; set `BROWSER_CHANNEL=chrome` only when using an installed Google Chrome. `python3 scripts/run_tests.py --skip-browser` explicitly skips browser coverage and must not be reported as a complete run. Browser data are synthetic. Outputs stay under ignored `tmp/`.
 
 ## 5. Serial device and permissions
 
@@ -121,15 +121,17 @@ Do not solve serial permissions with world-writable device permissions or a perm
 No device operation was performed during checkpoint packaging. Read the board wiring and manual boot steps in [RESTORE_USB.md](RESTORE_USB.md). Close other serial programs first. In the activated SDK shell and project directory:
 
 ```bash
-idf.py -p "$PORT" -b 115200 flash
+idf.py -B build-m6 -p "$PORT" -b 115200 flash
 # Release GPIO0 and reset for normal boot on a manually controlled adapter.
-idf.py -p "$PORT" monitor
+idf.py -B build-m6 -p "$PORT" monitor
 ```
 
 Monitor baud is 115200; exit with Ctrl+]. To restore the exact saved 5B image without rebuilding, use RESTORE_USB.md instead. Firmware version alone cannot identify which 0.4.0 image is installed.
 
 ## 7. Continue development
 
-The next planned work is **Milestone 6: Wi-Fi and Ethernet OTA with physical authorization and an explicitly planned partition migration**. The current single factory partition must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
+Milestone 6 network-update software is implemented; Initial v0.5.0 USB migration and v0.5.1 Wi-Fi OTA were user-confirmed successful. Ethernet OTA and detailed hardware/power-cut acceptance remain pending. The historical 0.4.0 single-factory layout must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
 
 Sources checked for these instructions: [official v6.1 manual Linux setup](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-macos-setup-legacy.html), [current Linux installation options](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-setup.html), [serial permissions and connection](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/establish-serial-connection.html), [official Node downloads](https://nodejs.org/en/download).
+
+For the pinned Mbed TLS host interoperability test and offline NVS generator test, see [Milestone 6 verification](docs/milestone6/README.md). SOURCE_SHA256SUMS.txt and docs/VERIFICATION.* describe the preserved 0.4.0 checkpoint, not the changed development sources.

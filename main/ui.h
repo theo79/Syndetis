@@ -7,3 +7,6 @@ void ui_init(void);
 void ui_input(uint8_t buttons);
 void ui_draw(void);
 bool ui_editing(void);
+
+// Update progress redraws only for a changed phase/percentage/message.
+bool ui_refresh_needed(void);

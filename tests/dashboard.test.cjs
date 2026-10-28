@@ -66,7 +66,7 @@ const next = () => {
   intervals.forEach(fn => fn());
   assert.equal(requests.length, 1);
   await finish(fixture());
-  assert.equal(element('firmware').textContent, '0.4.0');
+  assert.equal(element('firmware').textContent, '0.5.0');
   assert.equal(element('neighbors').children.length,2);
   assert.equal(element('speed').textContent, '100 Mbps');
   assert.equal(element('duplex').textContent, 'Full');

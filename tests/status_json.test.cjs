@@ -13,7 +13,7 @@ assert.equal(manual.dhcp.blocked_by_manual,true);
 assert.equal(manual.dhcp.ip,null);
 assert.deepEqual(manual.dhcp.dns,[null,null]);
 assert.ok(Buffer.byteLength(output[0])<16384);
-assert.equal(full.firmware,'0.4.0');
+assert.equal(full.firmware,'0.5.0');
 assert.equal(full.dhcp.error_code,-1);
 assert.equal(full.dhcp.error_step,'primary API');
 assert.equal(full.dhcp.cleanup_code,0x5001);

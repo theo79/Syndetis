@@ -1,4 +1,9 @@
-# Exact ESP-IDF v6.1 single-factory layout; reference for build/recovery verification.
+# Milestone 6: initial USB migration required; do not flash over factory layout.
+# NVS/PHY preserved. Table at 0x8000; bootloader must fit below it.
 nvs,data,nvs,0x9000,0x6000
 phy_init,data,phy,0xf000,0x1000
-factory,app,factory,0x10000,0x100000
+otadata,data,ota,0x10000,0x2000
+ota_0,app,ota_0,0x20000,0x1e0000
+ota_1,app,ota_1,0x200000,0x1e0000
+ota_keys,data,nvs,0x3e0000,0x20000
+# Reserved legacy region, unused by HTTP OTA; never read, provisioned or written.

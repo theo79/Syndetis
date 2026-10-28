@@ -1,4 +1,7 @@
 #include "services.h"
+#include "ota_update.h"
+#include "dhcp_test.h"
+#include "discovery.h"
 #include "access_config.h"
 #include "dashboard.h"
 #include "ethernet.h"
@@ -163,7 +166,7 @@ static void service_worker(void *arg)
         event_loop_error = log_result("esp_netif_init", esp_netif_init());
         netif_initialized = event_loop_error == ESP_OK;
     }
-    if (event_loop_error == ESP_OK) ethernet_start();
+    if (event_loop_error == ESP_OK) { ota_update_register_events(); ethernet_start(); }
     else {
         ethernet_status_t eth = {.state = ETH_ERROR, .error = event_loop_error};
         snprintf(eth.error_step, sizeof(eth.error_step), "Event loop");
@@ -202,6 +205,10 @@ void services_start(void)
 bool services_request_web(bool enable)
 {
     web_status_t web = status_get().web;
+    ota_state_t update=ota_update_status().state;
+    if(!enable && (update==OTA_AUTHORIZED || update==OTA_RECEIVING || update==OTA_VALIDATING)) {
+        ota_update_cancel();return false;
+    }
     if (!requests || web.state == WEB_STARTING || web.state == WEB_STOPPING) return false;
     if (enable && (!web.ssid[0] || web.state == WEB_ON || web.ap_running || web.http_running)) return false;
     web_status_t before = web;
@@ -209,4 +216,9 @@ bool services_request_web(bool enable)
     status_set_web(&web);
     if (xQueueSend(requests, &enable, 0) != pdTRUE) { status_set_web(&before); return false; }
     return true;
+}
+
+bool services_boot_healthy(void)
+{
+    return status_get().ethernet.state==ETH_READY && discovery_worker_started() && wired_worker_healthy();
 }

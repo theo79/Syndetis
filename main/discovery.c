@@ -16,7 +16,7 @@ typedef struct {
 static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static neighbor_table_t table;
 static QueueHandle_t frames;
-static bool available;
+static bool available, worker_started;
 static uint64_t clock_ms(void) { return esp_timer_get_time() / 1000; }
 
 static void parse_worker(void *arg)
@@ -24,6 +24,7 @@ static void parse_worker(void *arg)
     (void)arg;
     queued_frame_t frame;
     neighbor_t record;
+    portENTER_CRITICAL(&lock);worker_started=true;portEXIT_CRITICAL(&lock);
     for (;;) {
         if (xQueueReceive(frames, &frame, portMAX_DELAY) != pdTRUE) continue;
         parse_result_t result = neighbor_parse(frame.bytes, frame.length, &record);
@@ -121,4 +122,9 @@ bool discovery_snapshot(neighbor_table_t *out)
     bool ready = available;
     portEXIT_CRITICAL(&lock);
     return ready;
+}
+
+bool discovery_worker_started(void)
+{
+    portENTER_CRITICAL(&lock);bool ready=available && worker_started;portEXIT_CRITICAL(&lock);return ready;
 }

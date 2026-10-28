@@ -1,132 +1,129 @@
 # Syndetis
 
-**A compact Ethernet diagnostic tool for the field.**
+**A compact Ethernet diagnostic tool for technicians in the field.**
 
-**Plug in. Test the port. Understand what is happening.**
+**Plug in. Check the port. Understand the network.**
 
-Syndetis is a handheld Ethernet troubleshooting project built for network technicians, IT engineers, field service teams, and people working around industrial Ethernet. It aims to answer the questions that matter when standing in front of a switch, cabinet, wall outlet, router, or PLC—without opening a laptop for every first check.
+Syndetis is an ESP32-based handheld network troubleshooting prototype for IT, networking, SCADA and industrial field work. Its purpose is to answer common connectivity questions using a small OLED screen and three buttons—without opening a laptop just to check a switch or PLC connection.
 
-The idea is deliberately narrow: **useful network evidence, a small display, three buttons, and as little configuration as possible.** Syndetis is not intended to replace a packet analyzer or a full network tester.
+> **Project status — 28 October 2026:** Functional hardware prototype. Firmware **v0.5.0** was installed using the initial USB dual-OTA migration. A **v0.5.1 Wi-Fi OTA update via the local browser has been confirmed successful by the developer**. Ethernet OTA is implemented and software-tested but awaits a physical update test using a strictly newer version. Enclosure/productization remains in progress. This is not a production-certified network tester.
 
-> **Project status — October 2026:** Functional firmware prototype. Ethernet discovery, DHCP, temporary Manual IPv4, and four-request ICMP Ping have been exercised on hardware. The enclosure/productization and browser-based firmware-update work are still ahead. This is a development prototype, not a production-certified instrument.
+## Features
 
-## What Syndetis can do today
-
-| Capability | What it provides | Status |
-| --- | --- | --- |
-| **Ethernet link check** | Link up/down, negotiated 10/100 Mbps speed and duplex | Implemented; field tested |
-| **Passive device discovery** | Listens for LLDP and Cisco CDP; reports advertised device and port details when available | Implemented; field tested |
-| **Neighbor details** | Device name, port ID, advertised management IPv4, and protocol-specific details such as CDP native VLAN | Implemented; field tested |
-| **Explicit DHCP test** | Requests an address on demand; shows acquired IPv4, subnet, gateway, and DNS information, or a bounded failure/timeout result | Implemented; field tested |
-| **Temporary Manual IPv4** | Configure an address, prefix, and optional gateway on a static-IP network without DHCP | Implemented; hardware tested |
-| **IPv4 conflict awareness** | ARP probing/announcements, competing-probe detection, and address relinquishment on observed conflicts | Implemented; software and user-reported hardware checks |
-| **ICMP Ping** | Four requests to a gateway or custom IPv4 target; replies, loss, and average successful-reply RTT | Implemented; hardware tested |
-| **Local OLED interface** | Simple task-oriented menus operated by three physical buttons | Implemented; field tested |
-| **Wi-Fi management hotspot** | Physically enabled local web access at `192.168.4.1`; diagnostic Ethernet browser access remains blocked | Implemented; regression tested |
-| **USB firmware flashing** | Build and flash through the ESP-IDF serial workflow | Working |
-
-**Not in the current firmware:** Continuous Monitor, Wi-Fi firmware upload, Ethernet firmware upload, and OTA rollback. These must not be confused with earlier experiments or recovered historical source code.
-
-### A field-first workflow
-
-1. **Connect** Syndetis to an Ethernet port.
-2. **Check** whether the link is up and see the negotiated speed/duplex.
-3. **Identify** an advertising neighbor using LLDP/CDP—even without an IPv4 lease.
-4. **Test addressing** with DHCP, or explicitly enter a temporary Manual IPv4 configuration for static networks.
-5. **Ping** the gateway or a known target and see a compact result.
-
-Syndetis reports observations, not guessed diagnoses. For example, no DHCP lease does **not** prove a port is broken; an unanswered Ping does **not** prove a device is offline; and missing LLDP/CDP advertisements do **not** mean the network is empty.
-
-## Real-world validation
-
-The prototype has been tested against real network equipment, including **Cisco infrastructure** and **Siemens industrial Ethernet devices**.
-
-Selected observations from October 2026 field sessions:
-
-- Negotiated an active **100 Mbps full-duplex** Ethernet link.
-- Received and decoded **Cisco CDP** from a Cisco IR1101, including device identity, physical port ID, advertised management address, and native VLAN.
-- Received **Siemens LLDP** information in earlier field tests.
-- Successfully acquired a DHCP lease on a known DHCP-enabled network in approximately **4.4 seconds**, then verified release/retry behavior.
-- Found and repaired a real DHCP cleanup defect uncovered during field testing; the original error was caused by passing an invalid zero DNS address to an ESP-IDF network API.
-- Subsequently hardware-tested **Manual IPv4** and **four-request Ping**.
-
-The current 10/100 Ethernet hardware reports the speed **it negotiated**; it cannot determine the maximum capability of a gigabit switch port.
-
-Original field photographs and validation records are maintained separately. Any photos added to a public README should first have customer hostnames, internal addresses, and other identifying information redacted.
-
-## Prototype hardware
-
-| Part | Current implementation |
+| Feature | What it does |
 | --- | --- |
-| Controller | ESP32 on **WT32-ETH01** |
-| Wired networking | **LAN8720**, 10/100 Ethernet |
-| Display | **SH1106**, 128 × 64 monochrome OLED |
-| Controls | Three buttons: **UP**, **DOWN**, **OK** |
-| Firmware framework | Native **ESP-IDF v6.1** |
-| Current flash layout | Single **1 MiB factory application partition** |
+| Ethernet link | Shows link up/down and negotiated 10/100 Mbps speed and duplex |
+| Passive neighbor discovery | Decodes LLDP and Cisco CDP identity/port information when advertised |
+| DHCP test | Explicitly requests an IPv4 lease, reports addressing and handles timeout/cancel |
+| Manual IPv4 | Temporary address/prefix/gateway with conflict checks |
+| Ping | Four ICMP requests to the gateway or a custom IPv4, with replies/loss/average RTT |
+| OLED and buttons | 128×64 SH1106 display, UP / DOWN / OK and minimal task-oriented menus |
+| Wi-Fi hotspot | Local diagnostics dashboard at `http://192.168.4.1/` when enabled |
+| Network firmware update | Physically enabled HTTP browser updater over Wi-Fi or Ethernet, raw `.bin` upload, OLED progress and reboot |
+| OTA rollback | Dual application slots, new-image trial confirmation and rollback support |
+| USB recovery | Serial ROM programming remains available if needed |
 
-Short OK selects; holding OK goes back or cancels the active operation. The interface is designed to be understandable without a manual for routine tests.
+Syndetis reports observed facts rather than guessing the cause of every failure. For example, an unanswered ping does not by itself prove the target is offline, and missing LLDP/CDP advertisements do not prove nothing is connected.
 
-The electronics are still prototype hardware. Final power integration, enclosure validation, and reliability work are separate from the functional firmware milestones.
+## Hardware
 
-## Design and engineering principles
+- **Controller:** WT32-ETH01 / classic ESP32; inspected prototype ESP32-D0WD rev v1.1 with 4 MiB SPI flash
+- **Ethernet:** LAN8720A, 10/100 Mbps
+- **Display:** SH1106 128×64 monochrome OLED
+- **Controls:** three physical buttons — UP, DOWN, OK
+- **Firmware:** native Espressif **ESP-IDF v6.1**
 
-- **Passive discovery stays passive.** Syndetis listens to LLDP/CDP traffic; it does not actively scan an entire switched network or advertise itself as a neighbor.
-- **Network state has one owner.** DHCP and Manual IPv4 cannot control the wired interface at the same time. Stale results are rejected when connections or configurations change.
-- **Manual IPv4 is temporary.** It requires deliberate application, is not silently persisted, and is cleared when the physical connection changes. ARP-based conflict checks reduce risk but cannot guarantee an unused address.
-- **Ping stays Ping.** It uses ICMP, not an ARP response disguised as reachability. It can run with DHCP or an explicitly configured Manual IPv4 address.
-- **The diagnostic Ethernet port is not a general web server.** The existing management interface belongs to the physically enabled Wi-Fi hotspot.
-- **Keep it simple.** The product should answer field questions quickly rather than accumulate menus, graphs, scanners, and protocols.
+The prototype has been exercised with Cisco networking equipment and Siemens industrial Ethernet devices. It is intended to become a compact enclosed field tool, rather than remain a breadboard with loose wiring.
 
-## Building the firmware
+## Firmware updates — Wi-Fi and Ethernet
 
-The project targets **ESP-IDF v6.1** and the ESP32. Use the Espressif setup instructions for your operating system to install that release and activate its environment.
+The intended update process is deliberately simple:
 
-From the root of the standalone ESP-IDF project:
+1. On the device, select **Settings → Firmware Update** to open a temporary maintenance session.
+2. Connect a laptop or phone to the Syndetis Wi-Fi hotspot, or use the device's current Ethernet IPv4 address on the permitted local network.
+3. Open the browser updater and choose a **newer raw Syndetis application `.bin`**.
+4. Upload; the OLED shows **Preparing update → Uploading XX% → Verifying → Update complete / Rebooting**, or a short error.
+5. After reboot, confirm the new version in Device Info.
 
-```bash
-idf.py build
-```
+| Interface | Firmware update page |
+| --- | --- |
+| Wi-Fi hotspot | `http://192.168.4.1:8080/update` |
+| Ethernet | `http://<current-device-ip>:8080/update` |
 
-To flash over USB serial (replace the port with the one detected on your machine):
+**Confirmed hardware result:** The developer reports that Wi-Fi browser OTA successfully updated the device on 28 October 2026, using the prepared v0.5.1 release. Ethernet browser OTA is implemented and passes software/browser regressions; a real Ethernet upload has **not** yet been reported as successful.
 
-```bash
-idf.py -p /dev/ttyUSB0 flash monitor
-```
+**Important version transition:** The old v0.5.0 updater still required a one-time code for the upload that installed v0.5.1. The code was **removed in the v0.5.1 firmware**; newer sessions on v0.5.1 use physical authorization without a code. Do not confuse the behavior of the uploading version with the candidate version.
 
-On Windows, the serial port may look like `COM4`. The WT32-ETH01 prototype may require an external USB-to-serial programmer and the appropriate boot-mode wiring. **Do not run `erase-flash` as a normal update procedure.**
+The updater restricts access to a short, physically enabled maintenance window, validates image format/compatibility/length/version/hash, writes the inactive OTA slot and supports rollback. Ordinary browser dashboard access on customer Ethernet remains blocked.
 
-**Linux migration:** The portable `Syndetis5C` source checkpoint is being prepared for the private GitHub repository. Once published, use the `syndetis-5c` branch and its `LINUX_SETUP.md` for the exact clone, toolchain, test, and recovery steps. The checkpoint name is a packaging label; **it does not mean Continuous Monitor was added**.
+**Prototype security boundary:** Updates use local **HTTP**, not HTTPS, and images are **not cryptographically signed**. Hash checks detect unintentional corruption but do not authenticate the publisher. An attacker with permitted local network access during an active update window could potentially substitute firmware. This tradeoff is intentional for the current KISS prototype, not a claim of production-grade secure OTA.
 
-### Firmware and recovery status
+## Firmware layout
 
-The hardware-tested Milestone 5B application was reported as **905,792 bytes** within the current **1,048,576-byte** application partition. The `About` screen may still identify this development lineage as **0.4.0**; no release number should be inferred from the `Syndetis5C` folder name.
+The inspected device has **4 MiB flash**. The Milestone 6 partition layout is:
 
-USB recovery artifacts and historical code archives are preserved separately. Earlier A–G firmware contained Ping and OTA experiments, but it belongs to a **different development lineage** and must not be merged into the current firmware without review.
-
-## Roadmap
-
-| Phase | Focus | State |
+| Partition | Offset | Size |
 | --- | --- | --- |
-| Core field diagnostics | Link, LLDP/CDP, DHCP, Manual IPv4, Ping, OLED/buttons | **Functional prototype validated** |
-| Portable development checkpoint | Standalone `Syndetis5C` source, private GitHub branch, Linux reproducibility and recovery documentation | **Next checkpoint** |
-| **Milestone 6 — firmware updates** | **Wi-Fi hotspot and Ethernet firmware upload**, physical authorization, authenticated update admission, safe inactive-slot flashing and rollback | **Planned** |
-| Product engineering | Enclosure integration, practical USB-C power, field ergonomics, extended reliability testing | **Next phase** |
+| `nvs` | `0x9000` | `0x6000` |
+| `phy_init` | `0xF000` | `0x1000` |
+| `otadata` | `0x10000` | `0x2000` |
+| `ota_0` | `0x20000` | `0x1E0000` |
+| `ota_1` | `0x200000` | `0x1E0000` |
+| `ota_keys` | `0x3E0000` | `0x20000` (reserved/unused in HTTP prototype) |
 
-### Why OTA is a separate milestone
+The first conversion from the original factory partition to this layout required USB programming. Normal future application upgrades should use the network updater. Do not use a full-chip erase as a normal update workflow.
 
-The current device uses a **single factory application partition**. Reliable application OTA with rollback needs a validated flash/partition migration, inactive application slots, and a tested recovery plan. The initial transition is expected to require USB programming.
+## Build and test — OS-independent
 
-The intended update experience is: connect by the explicitly enabled Wi-Fi hotspot **or** an explicitly enabled, tightly restricted Ethernet maintenance service; select an application image; approve locally on the device; validate the update; write the inactive slot; reboot safely. **Neither Wi-Fi nor Ethernet OTA is implemented yet.**
+Development is **not tied to Kubuntu or any absolute filesystem path**. Supported development hosts include Windows and compatible Linux distributions such as Ubuntu/Kubuntu, Fedora and Arch. Install the official **ESP-IDF v6.1** toolchain and activate its environment using the instructions appropriate for the host.
 
-Continuous Monitor, packet capture, broad scanning, persistent traffic history, microSD logging, and desktop reporting are deliberately outside the present firmware scope.
+The project root is the directory containing `CMakeLists.txt`, `main/`, `scripts/`, `tests/` and `partitions.csv`.
 
-## Why this project exists
+```sh
+idf.py -B build-m6 build
+idf.py -B build-m6 size
+python scripts/verify_build.py build-m6
+python scripts/run_tests.py
+```
 
-A network technician in the field often needs a few reliable answers before reaching for a laptop:
+Tests need Node.js 20+, Python with cryptography (available in the activated SDK environment), and a native C compiler (GCC or Clang). The browser regression suite uses Playwright and project Node dependencies. From the directory containing `package-lock.json`:
 
-**Is the port active? What device am I connected to? Did I get an address? Can I reach the target?**
+```sh
+npm ci --ignore-scripts
+npx playwright install chromium
+```
 
-Syndetis is an attempt to make those first answers fast, clear, and portable—using actual measurements instead of speculation.
+On Linux, install Chromium OS dependencies if Playwright requests them (`npx playwright install --with-deps chromium`); on Windows use its host-specific installation. Run tests in the activated SDK Python environment. See [Linux setup](LINUX_SETUP.md) and [v0.5.1 release evidence](docs/milestone6/M6D_WIFI_OTA_0.5.1.md).
 
-**Syndetis is a working prototype and an ongoing engineering project.** The next challenge is turning validated firmware into a dependable handheld instrument.
+Use the host-specific serial port for inspection or emergency USB recovery (`COMx` on Windows, often `/dev/ttyUSB*` on Linux). Serial wiring and manual ESP32 ROM boot entry may be required on WT32-ETH01 hardware. Do not make `idf.py flash` part of the normal OTA update workflow.
+
+**Pinned reference SDK:** ESP-IDF v6.1, commit `fff9895c82d744c7237be8847347bdd1b07c6643`. See `docs/milestone6/` for migration, build and hardware acceptance evidence. Paths and activated virtual environments differ by host.
+
+## Development principles
+
+- **KISS:** Simple, usable, working; no feature bloat.
+- **Three buttons:** Clear field workflows without a user manual.
+- **Passive discovery:** LLDP/CDP listening, not broad active scanning.
+- **Explicit address operations:** DHCP or Manual IPv4 on demand, with resource ownership and cleanup.
+- **Practical OTA:** Physical authorization → select `.bin` → progress → reboot.
+- **No mandatory secrets infrastructure:** The prototype does not require one-time codes (v0.5.1 onward), production signing certificates, CA provisioning or a fixed wired IP.
+- **Preserve recovery:** Keep a verified flash backup and USB ROM access during enclosure development.
+
+Continuous monitoring, packet capture, long-term storage and additional diagnostic menus are outside the current scope.
+
+## Validation and next steps
+
+- Hardware field checks for link, neighbor discovery, DHCP, Manual IPv4 and Ping: **performed**.
+- Initial v0.5.0 USB migration to dual OTA layout: **user-confirmed successful**.
+- v0.5.1 Wi-Fi browser OTA: **user-confirmed successful**.
+- OLED progress, browser flow, validation and rollback: **automated tests pass**; detailed real-device progress/rollback measurements may still need recording.
+- **Next:** prepare a strictly newer firmware release and perform the first real **Ethernet OTA** upload; verify reboot, version and preserved diagnostics.
+- **Later:** finish enclosure and field reliability checks, keeping USB as emergency recovery.
+
+## Repository and preservation
+
+This repository is the **private source repository** for Syndetis. Never commit raw device flash backups, customer-network captures, generated build directories, credentials or other private material. The checked-out repository and `docs/milestone6/` contain the authoritative implementation and validation evidence; keep the portable handoff beside a complete copy when migrating development machines.
+
+---
+
+**Syndetis is a focused field tool: plug in, test, understand—and update it without opening the case.**
