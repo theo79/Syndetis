@@ -25,3 +25,13 @@ __pycache__/
 *.log
 *.p12
 *.pfx
+
+# Per-machine tool state and scratch directories.
+/.cache/
+/.codex/
+/.agents/
+/.aws/
+.DS_Store
+Thumbs.db
+*.core
+*.dmp

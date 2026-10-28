@@ -267,6 +267,7 @@ static void upload_worker(void *arg)
         if(ok)ok=show_notice("Verifying...");
         xSemaphoreTake(mutex,portMAX_DELAY);
         if(ok)ok=ota_engine_finish(&engine,now_ms());
+        else if(cancellation())ota_engine_cancel(&engine,"Cancelled");
         publish();xSemaphoreGive(mutex);
         response(req,ok?"200 OK":"400 Bad Request",ota_update_status().message);
         httpd_req_async_handler_complete(req);
@@ -381,5 +382,6 @@ void ota_update_health_frame(bool healthy)
     portEXIT_CRITICAL(&publication_lock);
 }
 
-bool ota_update_ui_begin(void) { return mutex && xSemaphoreTake(mutex,0)==pdTRUE; }
-void ota_update_ui_end(void) { xSemaphoreGive(mutex); }
+// Allocation failure disables OTA before its workers start; diagnostics still draw.
+bool ota_update_ui_begin(void) { return !mutex || xSemaphoreTake(mutex,0)==pdTRUE; }
+void ota_update_ui_end(void) { if(mutex)xSemaphoreGive(mutex); }

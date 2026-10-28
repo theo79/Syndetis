@@ -1,6 +1,6 @@
 # Milestone 6 — local browser firmware updates (v0.5.1)
 
-Hardware checkpoint: user-confirmed successful v0.5.1 Wi-Fi browser OTA on 28 October 2026. Ethernet OTA physical acceptance is pending; v0.5.2 is next.
+Historical milestone guide. Current firmware is 0.5.2; user-reported ordinary acceptance is 9/9 PASS, with exact final image identity pending. See [current manifest](../RELEASE_MANIFEST.md) and [acceptance record](../FINAL_FIELD_ACCEPTANCE.md). Earlier v0.5.1 Wi-Fi success remains historical evidence.
 
 Current architecture, 28 October 2026: physical OLED authorization, temporary HTTP port 8080 and raw ESP32 application .bin uploads over Wi-Fi or Ethernet. No firmware-signing requirement, CA, certificate, passphrase, hostname mapping or device identity provisioning. Earlier signed-HTTPS plans/results are historical and do not describe this build. Production credential generation was cancelled; no production credentials were created.
 

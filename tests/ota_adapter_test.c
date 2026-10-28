@@ -12,6 +12,7 @@ static jmp_buf loop_done;
 static httpd_req_t *current_req,*queued;
 static bool network_valid,async_fail,queue_fail,finished_request;
 static bool acknowledge_notice=true,prepare_seen,verify_seen;
+static int cancel_notice;
 static int recv_mode,io_failure,boot_selected,aborted,ended,confirmed,invalidated,restarted,stopped;
 static size_t flash_used;
 static uint8_t flashed[4096],package[4096];
@@ -28,7 +29,7 @@ QueueHandle_t xQueueCreate(unsigned n,size_t s){(void)n;(void)s;return (void*)2;
 int xQueueReceive(QueueHandle_t q,void*p,unsigned t){(void)q;(void)t;if(!queued)longjmp(loop_done,1);*(httpd_req_t**)p=queued;queued=NULL;return pdTRUE;}
 int xQueueSend(QueueHandle_t q,const void*p,unsigned t){(void)q;(void)t;if(queue_fail)return 0;CHECK(!queued);queued=*(httpd_req_t*const*)p;return pdTRUE;}
 int xTaskCreate(void (*fn)(void*),const char*n,unsigned s,void*a,unsigned p,void*h){(void)fn;(void)n;(void)s;(void)a;(void)p;(void)h;return pdPASS;}
-void vTaskDelay(unsigned t){if(notice_id!=shown_notice_id){clock_now+=t;if(acknowledge_notice){prepare_seen|=!strcmp(engine.message,"Preparing update...");verify_seen|=!strcmp(engine.message,"Verifying...");ota_update_health_frame(true);}return;}if(t==1){++clock_now;return;}longjmp(loop_done,1);}
+void vTaskDelay(unsigned t){if(notice_id!=shown_notice_id){clock_now+=t;if(cancel_notice && notice_id==(unsigned)cancel_notice){ota_update_cancel();cancel_notice=0;}if(acknowledge_notice){prepare_seen|=!strcmp(engine.message,"Preparing update...");verify_seen|=!strcmp(engine.message,"Verifying...");ota_update_health_frame(true);}return;}if(t==1){++clock_now;return;}longjmp(loop_done,1);}
 unsigned uxTaskGetStackHighWaterMark(void*a){(void)a;return 4096;}
 int64_t esp_timer_get_time(void){return (int64_t)clock_now*1000;}
 void esp_fill_random(void*p,size_t n){memset(p,0xa5,n);}
@@ -89,7 +90,7 @@ esp_err_t httpd_register_uri_handler(httpd_handle_t h,const httpd_uri_t*u){CHECK
 static void reset(bool ethernet)
 {
  writer_open=false;flash_used=0;boot_selected=aborted=ended=confirmed=invalidated=restarted=stopped=0;
- acknowledge_notice=true;prepare_seen=verify_seen=false;notice_id=shown_notice_id=0;recv_mode=io_failure=0;async_fail=queue_fail=finished_request=false;cancel_requested=upload_pending=own_web=open_requested=false;
+ cancel_notice=0;acknowledge_notice=true;prepare_seen=verify_seen=false;notice_id=shown_notice_id=0;recv_mode=io_failure=0;async_fail=queue_fail=finished_request=false;cancel_requested=upload_pending=own_web=open_requested=false;
  network_valid=flash_ok=nvs_ok=available=true;reserved=true;generation=1;trial=boot_done=false;clock_now=100;boot_started=0;ready_at=0;
  mutex=(void*)1;uploads=(void*)2;update_server=(void*)3;queued=NULL;
  app.web.state=WEB_ON;address=(dhcp_status_t){.active=true};strcpy(address.ip,"192.0.2.10");strcpy(address.mask,"255.255.255.0");
@@ -106,6 +107,8 @@ static void run_worker(void){if(!setjmp(loop_done))upload_worker(NULL);}
 static void run_supervisor(void){if(!setjmp(loop_done))supervise(NULL);}
 int main(void)
 {
+ // Optional OTA allocation failure must not freeze ordinary diagnostic redraws.
+ mutex=NULL;CHECK(ota_update_ui_begin());ota_update_ui_end();
  package_len=640;memset(package,0,sizeof(package));package[0]=0xe9;package[1]=4;package[23]=1;
  package[28]=0;package[29]=1;package[32]=0x32;package[33]=0x54;package[34]=0xcd;package[35]=0xab;
  strcpy((char*)package+48,"0.5.1");strcpy((char*)package+80,"Syndetis");
@@ -119,6 +122,12 @@ int main(void)
    if(mode==5&&eth)CHECK(engine.state==OTA_READY);else CHECK(engine.state!=OTA_READY&&boot_selected==0&&aborted==1);
   }
   for(int fail_io=1;fail_io<=5;++fail_io){reset(eth);r=request(eth);io_failure=fail_io;upload_post(&r);run_worker();CHECK(engine.state==OTA_FAILED);if(fail_io<5)CHECK(boot_selected==0);}
+ }
+ for(int notice=1;notice<=2;++notice){
+  reset(false);httpd_req_t r=request(false);cancel_notice=notice;
+  upload_post(&r);run_worker();
+  CHECK(engine.state==OTA_CANCELLED&&!engine.writer_open&&!writer_open&&!boot_selected);
+  CHECK(aborted==(notice==2));run_supervisor();CHECK(!reserved&&!update_server);
  }
  reset(false);httpd_req_t no_oled=request(false);acknowledge_notice=false;
  upload_post(&no_oled);run_worker();CHECK(engine.state==OTA_FAILED&&!boot_selected&&!flash_used);

@@ -12,6 +12,17 @@
 
 static int64_t now_ms(void) { return esp_timer_get_time() / 1000; }
 
+// Retry a failed frame even when the UI has no new progress to draw.
+static bool display_retry;
+static bool present_frame(void)
+{
+    esp_err_t err = display_present();
+    if (err != ESP_OK && !display_retry)
+        ESP_LOGE("Syndetis", "OLED transfer failed: %s; retrying", esp_err_to_name(err));
+    display_retry = err != ESP_OK;
+    return !display_retry;
+}
+
 void app_main(void)
 {
     ota_update_start(); // Trial watchdog also covers early display/UI initialization failure.
@@ -23,7 +34,7 @@ void app_main(void)
         return; // Do not reboot endlessly when the display is missing.
     }
     ui_draw_splash(0);
-    ESP_ERROR_CHECK(display_present());
+    present_frame();
     // Start at completion of the first visible frame, excluding I2C setup.
     int64_t start = now_ms();
     int last_stage = 0;
@@ -33,7 +44,7 @@ void app_main(void)
         int stage = elapsed < 900 ? elapsed / 180 : elapsed < 1050 ? 5 : elapsed < 1350 ? 6 : 7;
         if (stage != last_stage) {
             ui_draw_splash(elapsed);
-            ESP_ERROR_CHECK(display_present());
+            present_frame();
             last_stage = stage;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -42,7 +53,7 @@ void app_main(void)
     buttons_require_release();
     ui_init();
     ui_draw();
-    ESP_ERROR_CHECK(display_present());
+    present_frame();
     services_start();
     int64_t last_refresh = now_ms();
     for (;;) {
@@ -51,10 +62,9 @@ void app_main(void)
         uint8_t pressed = buttons_poll(now);
         if (pressed) ui_input(pressed);
         if ((pressed || now - last_refresh >= 250) && ota_update_ui_begin()) {
-            if(pressed || ui_refresh_needed()) {
+            if(pressed || display_retry || ui_refresh_needed()) {
                 ui_draw();
-                ESP_ERROR_CHECK(display_present());
-                ota_update_health_frame(services_boot_healthy());
+                if (present_frame()) ota_update_health_frame(services_boot_healthy());
             }
             ota_update_ui_end();
             last_refresh = now_ms();

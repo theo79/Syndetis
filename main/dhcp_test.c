@@ -176,11 +176,23 @@ static void cleanup(dhcp_status_t *s)
     portEXIT_CRITICAL(&lock);
     manual_running = false;
     // Drain callbacks before the synchronous tcpip-thread stop. No driver restart.
+    unsigned waited = 0;
     for (;;) {
         portENTER_CRITICAL(&lock);
         unsigned count = inflight;
         portEXIT_CRITICAL(&lock);
         if (!count) break;
+        if (waited++ >= 20) {
+            // Retain stack/DNS ownership until a later explicit Stop can drain RX.
+            portENTER_CRITICAL(&lock);
+            tx_enabled = false;
+            portEXIT_CRITICAL(&lock);
+            s->cleanup_error = true;
+            s->cleanup_code = ESP_ERR_TIMEOUT;
+            snprintf(s->cleanup_step, sizeof(s->cleanup_step), "RX drain timeout");
+            clear_addresses(s);
+            return;
+        }
         vTaskDelay(1);
     }
     // Keep primary outcome/API error independent from cleanup diagnostics.
@@ -643,6 +655,11 @@ publish:
             strcmp(state.mask, next.mask) || strcmp(state.gateway, next.gateway))
             ++address_generation;
         state = next;
+    } else if (next.cleanup_error) {
+        // Link/cancel owns the outcome, but cannot discard failed resource cleanup.
+        state.cleanup_error = true;
+        state.cleanup_code = next.cleanup_code;
+        snprintf(state.cleanup_step, sizeof(state.cleanup_step), "%s", next.cleanup_step);
     }
     // A newer cancellation/link event already owns published state and next step.
     portEXIT_CRITICAL(&lock);

@@ -6,6 +6,7 @@ parser=argparse.ArgumentParser();parser.add_argument('--skip-browser',action='st
 cc=shlex.split(os.environ.get('CC','cc'),posix=os.name!='nt');out=root/'tmp/host-tests';out.mkdir(parents=True,exist_ok=True)
 suffix='.exe' if os.name=='nt' else ''
 cases={
+'main_loop':['-Itests/ota_stubs','-Itests/host_stubs','-Imain','tests/main_loop_test.c'],
 'ota_adapter':['-Itests/ota_stubs','-Imain','main/ota_engine.c','main/ota_http_policy.c','tests/ota_adapter_test.c'],
 'ota':['-Imain','main/ota_http_policy.c','main/ota_engine.c','tests/ota_engine_test.c'],
 'core':['-Imain','main/neighbors.c','main/button_logic.c','tests/core_test.c'],

@@ -1,6 +1,6 @@
 # Linux setup — Syndetis Milestone 6
 
-This is the Milestone 6 development application, version **0.5.1**, for ESP32 / WT32-ETH01. The validated 0.4.0 checkpoint/recovery bytes are preserved. **Do not flash the new layout over a deployed unit before the [migration checklist](docs/milestone6/README.md) is approved.** No Windows object files, installed tools or parent source tree are needed. Internet is needed for initial SDK/tool/component/browser installation.
+This is the Milestone 6 development application, version **0.5.2**, for ESP32 / WT32-ETH01. The validated 0.4.0 checkpoint/recovery bytes are preserved. **Do not flash the new layout over a deployed unit before the [migration checklist](docs/milestone6/README.md) is approved.** No Windows object files, installed tools or parent source tree are needed. Internet is needed for initial SDK/tool/component/browser installation.
 
 ## 1. OS prerequisites
 
@@ -86,7 +86,7 @@ export PATH="$HOME/.local/opt/${node_archive%.tar.xz}/bin:$PATH"
 node --version
 ```
 
-Return to your cloned `Syndetis/Syndetis5C` directory, then:
+Return to your cloned `Syndetis` directory, then:
 
 ```bash
 npm ci --ignore-scripts
@@ -94,7 +94,7 @@ npx playwright install --with-deps chromium
 python3 scripts/run_tests.py
 ```
 
-The runner builds eleven actual-C suites, runs signing/provisioning validation and JSON/dashboard Node tests, then existing dashboard and new update-page Playwright scenarios. Host Python needs the cryptography package (already provided by the SDK Python environment); use that interpreter if the OS Python lacks it. It chooses the bundled browser by default; set `BROWSER_CHANNEL=chrome` only when using an installed Google Chrome. `python3 scripts/run_tests.py --skip-browser` explicitly skips browser coverage and must not be reported as a complete run. Browser data are synthetic. Outputs stay under ignored `tmp/`.
+The runner builds twelve actual-C suites, runs signing/provisioning validation and JSON/dashboard Node tests, then existing dashboard and new update-page Playwright scenarios. Host Python needs the cryptography package (already provided by the SDK Python environment); use that interpreter if the OS Python lacks it. It chooses the bundled browser by default; set `BROWSER_CHANNEL=chrome` only when using an installed Google Chrome. `python3 scripts/run_tests.py --skip-browser` explicitly skips browser coverage and must not be reported as a complete run. Browser data are synthetic. Outputs stay under ignored `tmp/`.
 
 ## 5. Serial device and permissions
 
@@ -130,7 +130,7 @@ Monitor baud is 115200; exit with Ctrl+]. To restore the exact saved 5B image wi
 
 ## 7. Continue development
 
-Milestone 6 network-update software is implemented; Initial v0.5.0 USB migration and v0.5.1 Wi-Fi OTA were user-confirmed successful. Ethernet OTA and detailed hardware/power-cut acceptance remain pending. The historical 0.4.0 single-factory layout must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
+Firmware 0.5.2 is feature-frozen as a release candidate. The user reports 9/9 ordinary hardware acceptance PASS; exact final image identity is pending. See docs/RELEASE_MANIFEST.md and docs/FINAL_FIELD_ACCEPTANCE.md. Destructive power-cut/rollback testing is not claimed. The historical 0.4.0 single-factory layout must not be treated as OTA-capable. Continuous Monitor remains deferred. Save/verify backups listed in docs/EXTERNAL_BACKUP_CHECKLIST.md before formatting Windows.
 
 Sources checked for these instructions: [official v6.1 manual Linux setup](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-macos-setup-legacy.html), [current Linux installation options](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/linux-setup.html), [serial permissions and connection](https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32/get-started/establish-serial-connection.html), [official Node downloads](https://nodejs.org/en/download).
 

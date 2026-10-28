@@ -26,11 +26,13 @@ static uint8_t sent_arp[128][60];
 static int64_t arp_times[128];
 static ip_addr_t resolver[DNS_MAX_SERVERS];
 static bool tcpip_context, restore_fails;
+static void (*cleanup_hook)(void);
 static esp_netif_t ap;
 static uint32_t ap_dns = 0xc0a80401;
 const ip_addr_t *dns_getserver(int i){CHECK(tcpip_context);return &resolver[i];}
 void dns_setserver(int i,const ip_addr_t *v){CHECK(tcpip_context);resolver[i].addr=v?v->addr:0;}
 esp_err_t esp_netif_tcpip_exec(esp_err_t (*fn)(void*),void*c){
+    if(fn==restore_dns&&cleanup_hook){void(*hook)(void)=cleanup_hook;cleanup_hook=NULL;hook();}
     if(fn==restore_dns&&restore_fails)return ESP_FAIL;
     CHECK(!tcpip_context);tcpip_context=true;esp_err_t e=fn(c);tcpip_context=false;return e;
 }
@@ -91,6 +93,7 @@ static void passive_check(void){
     CHECK(resolver[0].addr==0&&resolver[1].addr==0x12345678&&resolver[2].addr==0x87654321);
     discovery_check();
 }
+static void cleanup_link_cycle(void){dhcp_test_link(false);dhcp_test_link(true);}
 int main(void){
     uint8_t mac[6]={2};CHECK(dhcp_test_init(NULL,mac)==ESP_OK);
     ap.up=ap.started=true;ap.ip.ip.addr=0xc0a80401;
@@ -149,6 +152,24 @@ int main(void){
     injected_error=ESP_FAIL;restore_fails=true;CHECK(dhcp_test_request(true));step();
     CHECK(state.state==DHCP_ERROR&&state.error==ESP_FAIL&&strstr(state.error_step,"dhcpc_start")&&state.cleanup_error&&strstr(state.cleanup_step,"restore DNS"));
     injected_error=0;restore_fails=false;CHECK(dhcp_test_request(false));step();passive_check();
+    // A stuck receive callback cannot hang the sole wired worker indefinitely.
+    start();inflight=1;CHECK(dhcp_test_cancel_requesting());
+    int64_t drain_started=test_time_us;step();
+    CHECK(test_time_us-drain_started==20000&&state.cleanup_error&&state.cleanup_code==ESP_ERR_TIMEOUT);
+    CHECK(stack_started&&dns_borrowed&&!rx_enabled&&!tx_enabled&&!state.busy);
+    CHECK(!dhcp_test_request(true));inflight=0;
+    CHECK(dhcp_test_request(false));step();CHECK(!state.cleanup_error);passive_check();
+    // Link changes during Stop/Cancel must not discard failed DNS/stack ownership.
+    for(int failure=0;failure<2;++failure){
+        start();CHECK(dhcp_test_cancel_requesting());
+        restore_fails=failure==0;stop_fails=failure==1;cleanup_hook=cleanup_link_cycle;
+        step();CHECK(state.cleanup_error&&state.cleanup_code==ESP_FAIL&&!state.active);
+        step();CHECK(!state.busy&&state.cleanup_error&&!dhcp_test_request(true));
+        CHECK(wired_manual_apply(&(manual_ipv4_t){.ip=0xc000020a,.prefix=24},address_generation)!=NULL);
+        unsigned update;CHECK(!wired_update_reserve(&update));
+        restore_fails=stop_fails=false;CHECK(dhcp_test_request(false));step();
+        CHECK(!state.cleanup_error);passive_check();
+    }
     uint8_t arp[64]={0};arp[12]=8;arp[13]=6;CHECK(dhcp_stack_frame(arp,64));CHECK(!dhcp_stack_frame(arp,14));
     uint8_t *udp=packet(0x0800);CHECK(dhcp_stack_frame(udp,64));udp[20]=0x20;CHECK(!dhcp_stack_frame(udp,64));udp[20]=0;udp[35]=53;CHECK(!dhcp_stack_frame(udp,64));udp[35]=67;udp[12]=0x81;udp[13]=0;CHECK(!dhcp_stack_frame(udp,64));tracked_free(udp);
     puts("PASS: actual DHCP worker: boot passive, explicit start, duplicates, acquisition/duration, timeout, cancel/late state, link/address loss, overlap, cleanup failures/retry; dispatcher consumes each owned buffer once and blocks Ethernet TCP");
