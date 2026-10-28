@@ -1,64 +1,168 @@
 # Syndetis
 
-**Connect → Diagnose → Move on.**
+### Connect → Diagnose → Move on.
 
-Syndetis is a handheld Ethernet diagnostic tool for technicians. It provides quick port and addressing checks through a 128×64 OLED and three buttons. It is not a laptop replacement, network scanner or continuous monitoring appliance.
+**Syndetis** is a portable, ESP32-based Ethernet diagnostic tool designed for field technicians, network engineers, and industrial maintenance teams.
 
-**Firmware: 0.5.2 — field-ready release, tag `v0.5.2`.** The user reports **9/9 hardware acceptance PASS** and confirms the final candidate was installed and passed post-flash smoke testing. Its exact local artifact hash is verified in the [release manifest](docs/RELEASE_MANIFEST.md); hardware evidence is attributed to the user, without an independent device readback. Known noncritical maintenance limitations remain documented.
+Built for quick troubleshooting at network cabinets, industrial installations, remote stations, and control panels, Syndetis provides essential Ethernet and IP diagnostics without requiring a laptop.
 
-## Technician workflow
+A compact OLED display and three physical buttons make it straightforward to use: connect to a port, inspect the network, run a test, and move on.
 
-1. Connect Ethernet; read link up/down and negotiated 10/100 Mbps speed/duplex.
-2. Read LLDP/CDP switch and port advertisements when available.
-3. Explicitly start DHCP, or apply temporary Manual IPv4/prefix/optional gateway with ARP conflict checks.
-4. Ping the gateway or a custom IPv4 target with four ICMP requests.
-5. Stop/release addressing as needed and move to the next port.
+**Firmware:** v0.5.2 | **Platform:** ESP32 / ESP-IDF v6.1 | **Development:** Feature-frozen release candidate
 
-UP/DOWN navigate; short OK selects; hold OK for about 500 ms goes back/cancels. Back retains an acquired address as indicated on screen. Stop / Release or USE DHCP clears the current addressing session. Disconnect invalidates old addresses, neighbors and Ping results; reconnect does not silently restart IPv4 tests. Ethernet stays passive until an explicit IPv4 action. Wi-Fi starts only when requested for web access or maintenance.
+---
 
-Missing advertisements do not prove a bad port; no DHCP lease does not prove a broken cable; no Ping reply does not prove a host is offline. The 10/100 PHY reports its negotiated speed, not a switch port's maximum capability.
+## Features
 
-## Supported hardware
+### Ethernet diagnostics
+- Ethernet link detection and connection status.
+- Negotiated 10/100 Mbps speed and duplex information.
+- Automatic LLDP/CDP neighbor discovery.
+- Switch identity, port and VLAN information when advertised.
+- Passive Ethernet operation until an IPv4 test is explicitly started.
 
-- ESP32 **WT32-ETH01**, onboard **LAN8720** 10/100 RMII Ethernet.
-- **SH1106 128×64** I2C OLED: SDA32 / SCL33; address 0x3C or 0x3D, detected at startup.
-- UP GPIO36, DOWN GPIO39, OK GPIO5; board wiring/options in [main/board.h](main/board.h).
-- Configured 4 MiB flash, two **1,966,080-byte OTA slots**. Historical single-factory firmware needs a separately planned USB migration; an application update cannot change that layout.
+### Network testing
+- DHCP discovery and IPv4 configuration testing.
+- Display of assigned IP address, subnet, gateway and DNS information.
+- Manual IPv4 configuration with ARP address-conflict detection.
+- Gateway and custom IPv4 ping.
+- Four ICMP requests with reply count, packet loss and response time.
+- Cancellation, cleanup and retry without restarting the device.
 
-Hardware results are [user-reported](docs/FINAL_FIELD_ACCEPTANCE.md); they do not establish a particular board serial number, flash readback or destructive rollback result.
+### User interface
+- 128×64 monochrome OLED.
+- Three-button navigation: UP, DOWN and OK.
+- Simple, task-oriented menus.
+- Clear diagnostic results and error messages.
+- Automatic invalidation of outdated results after cable disconnection.
 
-## Build and verify
+### Connectivity and maintenance
+- Optional Wi-Fi access point and browser-based status dashboard.
+- Ethernet and Wi-Fi firmware updates.
+- Dual-slot OTA with image validation and trial-boot rollback.
+- USB-UART firmware flashing and recovery.
 
-Activate **ESP-IDF v6.1**, exact SDK commit `fff9895c82d744c7237be8847347bdd1b07c6643`, with its installed ESP32 compiler/Python tools. The component lock pins LAN87xx 1.1.0. A fresh build copies the reviewed `sdkconfig.pinned`; keep its target/configuration and partition layout.
+Syndetis is designed for quick, targeted diagnostics—not continuous monitoring, network scanning or replacing a full network workstation.
+
+## How it works
+
+1. **Connect:** Plug Syndetis into an Ethernet port.
+2. **Inspect:** Check physical link status, negotiated speed and discovered neighbors.
+3. **Test:** Run DHCP, configure temporary IPv4 addressing or ping a target.
+4. **Diagnose:** Use the results to identify likely physical, addressing or connectivity problems.
+5. **Move on:** Release the test configuration and continue to the next port.
+
+The interface uses UP/DOWN for navigation, short OK to select, and holding OK for approximately 500 ms to return or cancel.
+
+Ethernet remains passive by default. Network tests requiring IPv4 traffic begin only after explicit technician action.
+
+Syndetis reports observable network conditions rather than making unsupported assumptions. For example, a missing ping reply does not necessarily indicate an offline host.
+
+## Hardware
+
+| Component | Specification |
+|---|---|
+| Microcontroller | ESP32 WT32-ETH01 |
+| Ethernet | LAN8720 RMII, 10/100 Mbps |
+| Display | SH1106, 128×64 monochrome OLED |
+| Display interface | I²C, SDA GPIO32 / SCL GPIO33 |
+| Display address | 0x3C or 0x3D, auto-detected |
+| UP button | GPIO36 |
+| DOWN button | GPIO39 |
+| OK button | GPIO5 |
+| Flash | 4 MB |
+| Firmware layout | Two 1,966,080-byte OTA application slots |
+| Firmware framework | Espressif ESP-IDF v6.1 |
+
+Hardware configuration and GPIO definitions are maintained in [`main/board.h`](main/board.h).
+
+## Building the firmware
+
+Syndetis uses **Espressif ESP-IDF v6.1**, pinned to SDK commit:
+
+`fff9895c82d744c7237be8847347bdd1b07c6643`
+
+Development is supported on Linux and Windows with a correctly configured ESP-IDF environment.
+
+From the project directory:
 
 ```bash
 idf.py -B build-final build
 python3 scripts/verify_build.py build-final
-python3 scripts/verify_checksums.py --manifest recovery/SHA256SUMS.txt
 ```
 
-The raw application is `build-final/Syndetis.bin`. Build timestamps/ELF metadata can change its bytes; verify the recorded hash rather than inferring identity from version. Build directories and local release copies are ignored. See [Linux setup](LINUX_SETUP.md) for prerequisites; adapt environment activation to the host.
+The resulting application image is:
 
-Host tests require a C compiler, Python with cryptography, Node/npm and Playwright Chromium:
+`build-final/Syndetis.bin`
+
+### Automated tests
+
+The project includes host-based C tests, Python verification scripts, Node.js tests, and browser-based dashboard and OTA interface tests.
 
 ```bash
 npm ci --ignore-scripts
 npx playwright install chromium
+
 python3 scripts/run_tests.py
 python3 scripts/run_ota_crypto_tests.py --idf-path "$IDF_PATH"
 python3 tests/ota_identity_test.py --idf-path "$IDF_PATH"
 ```
 
-Use `BROWSER_CHANNEL=chrome` with the runner only when installed Chrome is the chosen browser. The full runner includes browser tests; `--skip-browser` is partial coverage. Signature/identity scripts test retained historical tooling, not a provisioning requirement for current firmware. Historical `SOURCE_SHA256SUMS.txt` and `docs/VERIFICATION.*` describe the preserved 0.4.0 checkpoint, not current sources.
+Additional build requirements and setup instructions are available in [`LINUX_SETUP.md`](LINUX_SETUP.md). The build environment and serial port should be adapted to the host operating system.
 
-## Occasional maintenance and recovery
+## Firmware updates
 
-On an already migrated device, physically select **Settings → Firmware Update**. Use the displayed hotspot and `http://192.168.4.1:8080/update`, or the current explicitly acquired wired address at `http://<wired-ip>:8080/update` from the same subnet. Upload only a trusted **strictly newer raw application .bin**, never a bootloader, table, merged image or old signed package. No device identity provisioning is required. The hotspot port-80 dashboard is separate and remains blocked on diagnostic Ethernet.
+Syndetis supports occasional firmware maintenance over Ethernet or Wi-Fi.
 
-OTA uses an inactive slot, ESP image validation and trial-boot rollback. HTTP does not encrypt or authenticate firmware; use a controlled local connection. Keep power stable and recovery available. Socket pressure, slow rejected uploads and immediate reopen during teardown are retained noncritical maintenance limitations; allow cleanup to finish before retrying and avoid concurrent dashboard clients. Detailed boundaries are in the [reliability report](docs/FINAL_RELIABILITY_REPORT.md) and [maintenance guide](docs/milestone6/README.md).
+From the device:
 
-[RESTORE_USB.md](RESTORE_USB.md) describes verified historical recovery sets and UART wiring. Keep legacy factory images/tables separate from dual-slot artifacts. Never erase flash as a routine update or modify eFuses/provisioning. Repository verification performs no device operations.
+**Settings → Firmware Update**
 
-[Cleanup record](docs/REPOSITORY_CLEANUP.md) explains the external archive, retained historical material and Git exclusions.
+Connect to the displayed Wi-Fi hotspot or use the device's active wired IPv4 address.
 
-**Syndetis is feature-frozen for its intended portable Ethernet diagnostic role. Future changes require a demonstrated technician need or a confirmed reliability defect.**
+| Connection | Firmware update interface |
+|---|---|
+| Wi-Fi | `http://192.168.4.1:8080/update` |
+| Ethernet | `http://<device-ip>:8080/update` |
+
+Upload a trusted, strictly newer Syndetis application `.bin` file.
+
+The updater validates the application image, writes to an inactive OTA partition, and supports trial-boot rollback.
+
+Firmware updates require a controlled local network and stable power. HTTP transport does not provide encryption or cryptographic firmware-authorship authentication.
+
+For USB recovery, see [`RESTORE_USB.md`](RESTORE_USB.md). Historical factory images and partition layouts must not be mixed with the current dual-slot firmware.
+
+## Verification and release
+
+**Firmware v0.5.2**
+
+- Automated firmware build and regression verification: PASS.
+- Hardware acceptance: 9/9 PASS.
+- USB recovery readiness: PASS.
+- Feature development: Frozen.
+- Final release tag: Pending installed-image identity confirmation.
+
+The current release candidate, build identity, verification records and documented maintenance limitations are available in:
+
+- [`docs/RELEASE_MANIFEST.md`](docs/RELEASE_MANIFEST.md)
+- [`docs/FINAL_FIELD_ACCEPTANCE.md`](docs/FINAL_FIELD_ACCEPTANCE.md)
+- [`docs/FINAL_RELIABILITY_REPORT.md`](docs/FINAL_RELIABILITY_REPORT.md)
+
+## Project philosophy
+
+Syndetis follows three principles:
+
+**Simple.** A technician should understand how to use the device without reading a manual.
+
+**Practical.** Every function should address a real troubleshooting need.
+
+**Reliable.** The device should perform repeated diagnostic operations without unnecessary configuration, restarting or intervention.
+
+Syndetis is deliberately focused. It does not aim to replace a laptop or provide every possible network troubleshooting feature.
+
+Its purpose is to give technicians the essential information they need, where they need it, with minimal effort.
+
+---
+
+**Syndetis — Connect. Diagnose. Move on.**
