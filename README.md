@@ -8,6 +8,24 @@ The idea is simple: connect to a network port, check what is happening, and get 
 
 **Firmware:** v0.5.2 &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1 &nbsp; | &nbsp; **Status:** Working prototype
 
+---
+
+## Hardware & Interface Preview
+
+> **Note:** Save your four images in a `docs/images/` folder in your repository using the filenames below (`hardware-link.jpg`, `hardware-menu.jpg`, `hardware-cdp.jpg`, and `web-dashboard.jpg`).
+
+| Field Hardware (Link & IP) | Main Menu |
+| :---: | :---: |
+| <img src="docs/images/hardware-link.jpg" alt="Syndetis Link and IP status on OLED" width="380"> | <img src="docs/images/hardware-menu.jpg" alt="Syndetis OLED main menu" width="300"> |
+| *Physical link up, 100 Mbps full-duplex readout* | *OLED navigation with UP / DOWN / OK buttons* |
+
+| Switch Discovery (CDP) | Local Wi-Fi Web Dashboard |
+| :---: | :---: |
+| <img src="docs/images/hardware-cdp.jpg" alt="Syndetis CDP neighbor info on OLED" width="300"> | <img src="docs/images/web-dashboard.jpg" alt="Syndetis mobile web dashboard at 192.168.4.1" width="240"> |
+| *Passive CDP/LLDP neighbor switch & MAC discovery* | *Live status view on mobile via `192.168.4.1`* |
+
+---
+
 ## What it can do
 
 ### Ethernet and switch information
