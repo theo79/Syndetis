@@ -4,7 +4,7 @@
 
 Syndetis is a handheld Ethernet diagnostic tool for technicians. It provides quick port and addressing checks through a 128×64 OLED and three buttons. It is not a laptop replacement, network scanner or continuous monitoring appliance.
 
-**Firmware: 0.5.2. Status: RELEASE CANDIDATE — FINAL HARDWARE IMAGE CONFIRMATION PENDING.** The user reports **9/9 hardware acceptance PASS**, including ordinary OTA maintenance and non-destructive USB recovery readiness; the tested binary's exact identity was not supplied. Software checks and the final image are recorded in the [release manifest](docs/RELEASE_MANIFEST.md). No final release tag is created while that identity gate is pending.
+**Current accepted release: v0.5.2.** The released image passed user-reported hardware acceptance and post-flash smoke testing. See the [v0.5.2 release manifest](https://github.com/theo79/Syndetis/blob/9717f1745724a11a64864a1c5627e393f7d49eca/docs/RELEASE_MANIFEST.md).
 
 ## Technician workflow
 
@@ -18,6 +18,22 @@ UP/DOWN navigate; short OK selects; hold OK for about 500 ms goes back/cancels. 
 
 Missing advertisements do not prove a bad port; no DHCP lease does not prove a broken cable; no Ping reply does not prove a host is offline. The 10/100 PHY reports its negotiated speed, not a switch port's maximum capability.
 
+## Diagnostic Reports
+
+The M7 dashboard export and OLED menu entry are unreleased development features. Physical hardware acceptance is pending.
+
+1. On the OLED main menu, choose **Web Access → Enable** and wait for Web Access to start.
+2. Open **Web Access → Connection details** for the hotspot name and password. Join that Wi-Fi network and open <http://192.168.4.1/> in your browser.
+3. In the dashboard's **Diagnostic report** section, wait for the first status update, then select **Download diagnostic report** to save a JSON file.
+
+The report includes firmware version and uptime, Ethernet initialization and link status, negotiated speed and duplex, wired addressing mode and state, DHCP status and timing, and LLDP/CDP discovery status, counters, neighbor protocol, TTL, age, and expiry. It includes Ethernet and DHCP error details when available. Ping statistics and device wall-clock timestamps are unavailable in the report.
+
+Network identifiers are omitted by default. Select **Include network identifiers** to include available MAC and IP addresses, subnet, gateway and DNS settings, and switch, chassis, port and VLAN details. These fields can reveal network topology when you share the file.
+
+The report uses the last valid dashboard snapshot and records browser UTC receipt and export times, snapshot age, and whether the data is stale. A failed status poll or a snapshot older than four seconds marks the data stale. You can still download it after disconnecting if the dashboard tab stays open and has received a valid update. Reloading or closing the page discards the cached snapshot.
+
+The OLED **Diagnostic Report** item follows **Settings** in the main menu. It shows the dashboard URL when Web Access is on, asks you to enable Web Access when it is off, and shows **Check Web Access** during startup, shutdown, or an error. Short or held OK returns to the main menu with the item selected. Wi-Fi activation stays in Web Access, and the download happens in the browser.
+
 ## Supported hardware
 
 - ESP32 **WT32-ETH01**, onboard **LAN8720** 10/100 RMII Ethernet.
@@ -25,7 +41,7 @@ Missing advertisements do not prove a bad port; no DHCP lease does not prove a b
 - UP GPIO36, DOWN GPIO39, OK GPIO5; board wiring/options in [main/board.h](main/board.h).
 - Configured 4 MiB flash, two **1,966,080-byte OTA slots**. Historical single-factory firmware needs a separately planned USB migration; an application update cannot change that layout.
 
-Hardware results are [user-reported](docs/FINAL_FIELD_ACCEPTANCE.md); they do not establish a particular board serial number, flash readback or destructive rollback result.
+Hardware results are [user-reported](https://github.com/theo79/Syndetis/blob/9717f1745724a11a64864a1c5627e393f7d49eca/docs/FINAL_FIELD_ACCEPTANCE.md); they do not establish a particular board serial number, flash readback or destructive rollback result.
 
 ## Build and verify
 
@@ -61,4 +77,4 @@ OTA uses an inactive slot, ESP image validation and trial-boot rollback. HTTP do
 
 [Cleanup record](docs/REPOSITORY_CLEANUP.md) explains the external archive, retained historical material and Git exclusions.
 
-**Syndetis is feature-frozen for its intended portable Ethernet diagnostic role. Future changes require a demonstrated technician need or a confirmed reliability defect.**
+**The accepted v0.5.2 release is feature-frozen for its intended portable Ethernet diagnostic role. Future changes require a demonstrated technician need or a confirmed reliability defect.**
