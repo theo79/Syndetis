@@ -6,7 +6,7 @@ Syndetis is a small, ESP32-based project I've been building to make everyday Eth
 
 The idea is simple: connect to a network port, check what is happening, and get useful information without having to reach for a laptop every time.
 
-**Firmware:** v0.5.2 &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1 &nbsp; | &nbsp; **Status:** Working prototype
+**Firmware candidate:** v0.6.0 &nbsp; | &nbsp; **Last hardware-accepted release:** v0.5.2 &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1
 
 ---
 
@@ -154,7 +154,7 @@ Upload a trusted, **strictly newer** Syndetis application `.bin` image. The firm
 
 ## Project status
 
-**v0.5.2** is the current documented firmware version. The prototype has completed recorded software verification and user-reported hardware acceptance; the final v0.5.2 candidate was confirmed installed and smoke-tested. Feature development is currently frozen while the focus remains on reliability and practical field use.
+**v0.6.0** is a release candidate pending physical hardware acceptance. It adds JSON diagnostic reports and the OLED Diagnostic Report screen. **v0.5.2** remains the last hardware-accepted release, with user-reported installation and post-flash smoke testing.
 
 For technical details, verification scope, and known limitations:
 
