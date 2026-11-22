@@ -12,7 +12,6 @@ The idea is simple: connect to a network port, check what is happening, and get 
 
 ## Hardware & Interface Preview
 
-> **Note:** Save your four images in a `docs/images/` folder in your repository using the filenames below (`hardware-link.jpg`, `hardware-menu.jpg`, `hardware-cdp.jpg`, and `web-dashboard.jpg`).
 
 | Field Hardware (Link & IP) | Main Menu |
 | :---: | :---: |
