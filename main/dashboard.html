@@ -26,12 +26,62 @@ button{font:inherit;padding:8px 14px;margin:6px 6px 0 0;cursor:pointer}button:di
 <p>Start runs for up to 30 seconds. An acquired lease remains active until Stop / Release, link loss, address loss or reboot. Leaving this browser page does not cancel the test; use Stop / Release. OLED Back cancels a requesting test.</p></section>
 </div>
 <p id="last">No successful update yet</p>
+<section><h2>Diagnostic report</h2>
+<p><label><input type="checkbox" id="report-identifiers"> Include network identifiers</label></p>
+<p>Leave unchecked to omit device and switch identifiers and network addresses. The report is saved by your browser.</p>
+<button id="report-download" disabled>Download diagnostic report</button>
+</section>
 <footer>Management hotspot: 192.168.4.1. Ethernet IPv4 starts OFF; DHCP requires explicit Start. Browser access is hotspot only.<br>Disable Web Access on the physical tester to stop this server. There is no separate dashboard login while access is enabled.</footer>
 </main>
 <script>
 'use strict';
 const el=id=>document.getElementById(id);
-let lastSuccess=0, actionPending=false;
+let lastSuccess=0, lastSnapshot=null, actionPending=false;
+function downloadReport(){
+  if(!lastSnapshot)return;
+  const now=Date.now(), age=Math.max(0,now-lastSuccess);
+  const identifiers=el('report-identifiers').checked;
+  const {firmware,uptime_seconds,ethernet,addressing,dhcp,switch_info}=lastSnapshot;
+  const pick=(source, keys)=>Object.fromEntries(keys.map(key=>[key,source[key]]));
+  const report={
+    schema_version:1,
+    snapshot_received_at:new Date(lastSuccess).toISOString(),
+    exported_at:new Date(now).toISOString(),
+    snapshot_age_ms:age,
+    stale:el('connection').classList.contains('stale')||age>4000,
+    network_identifiers_included:identifiers,
+    firmware,uptime_seconds,
+    ethernet:pick(ethernet,['initialization','error_code','error_step','link','speed_mbps','duplex',
+      ...(identifiers?['mac','ip']:[])]),
+    addressing:addressing==null?addressing:pick(addressing,['mode','state',
+      ...(identifiers?['prefix','gateway']:[])]),
+    dhcp:pick(dhcp,['blocked_by_manual','state','requesting','active','busy','cleanup_error',
+      'duration_ms','error_code','error_step','cleanup_code','cleanup_step',
+      ...(identifiers?['ip','mask','gateway','dns']:[])]),
+    switch_info:{
+      ...pick(switch_info,['state','observation_seconds','capacity','capacity_drops','queue_drops',
+        'invalid_frames','limited_frames']),
+      neighbors:switch_info.neighbors.map(n=>pick(n,['slot','protocol','ttl_seconds','age_seconds',
+        'expired','sanitized',...(identifiers?['source_mac','name','chassis','port_id',
+          'port_description','management_ip','management_source','vlan_kind','vlan']:[])]))
+    },
+    ping_statistics:'unavailable',
+    device_wall_clock:'unavailable'
+  };
+  const blob=new Blob([JSON.stringify(report,null,2)+'\n'],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download='syndetis-diagnostic-report.json';
+  document.body.append(link);
+  try{link.click();}
+  finally{
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+}
+el('report-download').onclick=downloadReport;
+
 function renderDhcp(d,link){
   if(!d||typeof d.state!=='string'||typeof d.active!=='boolean'||typeof d.requesting!=='boolean'||!Array.isArray(d.dns))throw new Error('Invalid DHCP state');
   el('dhcp-state').textContent=d.state+(d.busy?' · applying/cleanup':'')+(d.error_code?` · ${d.error_step} (${d.error_code})`:'')+(d.cleanup_error?` · Cleanup: ${d.cleanup_step} (${d.cleanup_code}); retry Stop / Release`:'');
@@ -96,7 +146,7 @@ async function poll(){
   try{
     const response=await fetch('/api/status',{cache:'no-store',signal:controller.signal});
     if(!response.ok)throw new Error('Status request failed');
-    const s=await response.json(), e=s.ethernet;
+    const s=await response.json(), receivedAt=Date.now(), e=s.ethernet;
     if(typeof s.firmware!=='string'||!Number.isFinite(s.uptime_seconds)||!e||
        !['Initializing','Ready','Error'].includes(e.initialization)||
        !['Up','Down','Unavailable'].includes(e.link)||
@@ -119,7 +169,9 @@ async function poll(){
     el('error').textContent=e.initialization==='Error'?`Ethernet error: ${e.error_step} (code ${e.error_code})`:'';
     renderSwitch(s.switch_info);
     renderDhcp(s.dhcp,e.link);
-    lastSuccess=Date.now();
+    lastSuccess=receivedAt;
+    lastSnapshot=s;
+    el('report-download').disabled=false;
     el('last').textContent=`Last update: ${new Date(lastSuccess).toLocaleTimeString()}`;
     el('connection').textContent='Connected to tester · live status';
     el('connection').classList.remove('stale');

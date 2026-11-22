@@ -13,6 +13,30 @@ const {status: statusFixture} = require('./fixtures.cjs');
       const page = await browser.newPage({viewport: {width, height}});
       let online = true, down = false, expired = false, external = [], active = 0, maximum = 0, dhcpActive=false, manualActive=false, actions=0;
       const errors = [];
+      let releaseFirstPoll;
+      const firstPoll=new Promise(resolve=>{releaseFirstPoll=resolve;});
+      await page.addInitScript(()=>{
+        window.pageRequests=[];
+        const fetchStatus=window.fetch;
+        window.fetch=(url,options)=>{
+          window.pageRequests.push((options?.method||'GET')+' '+url);
+          return fetchStatus(url,options);
+        };
+      });
+      const saveReport=async()=>{
+        const before=await page.evaluate(()=>window.pageRequests.length);
+        const filePromise=page.waitForEvent('download');
+        await page.locator('#report-download').click();
+        const download=await filePromise;
+        assert.equal(download.suggestedFilename(),'syndetis-diagnostic-report.json');
+        const chunks=[];
+        for await(const chunk of await download.createReadStream())chunks.push(chunk);
+        const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        const exportRequests=await page.evaluate(index=>window.pageRequests.slice(index),before);
+        assert.ok(exportRequests.every(request=>request==='GET /api/status'));
+        return data;
+      };
+
       page.on('pageerror', error => errors.push(error.message));
       await page.route('**/*', async route => {
         const url = new URL(route.request().url());
@@ -26,6 +50,7 @@ const {status: statusFixture} = require('./fixtures.cjs');
         if (url.pathname === '/api/status') {
           active++; maximum = Math.max(maximum, active);
           try {
+            await firstPoll;
             if (!online) return await route.abort('connectionfailed');
             await route.fulfill({contentType: 'application/json', body: JSON.stringify((()=>{const s=statusFixture(down,expired);if(dhcpActive){s.dhcp={...s.dhcp,active:true,state:'Address acquired',ip:'192.0.2.7',mask:'255.255.255.0',gateway:'192.0.2.1',dns:['192.0.2.53',null]};s.ethernet.ip=s.dhcp.ip;}if(manualActive){s.addressing={mode:'MANUAL IP',state:'Manual IP active',prefix:24,gateway:null};s.ethernet.ip='192.168.10.250';s.dhcp.blocked_by_manual=true;}return s;})())});
           } finally { active--; }
@@ -34,6 +59,9 @@ const {status: statusFixture} = require('./fixtures.cjs');
         return route.fulfill({status: 404, body: ''});
       });
       await page.goto('http://syndetis.test/');
+      assert.ok(await page.locator('#report-download').isDisabled());
+      assert.equal(await page.locator('#report-identifiers').isChecked(),false);
+      releaseFirstPoll();
       await page.waitForFunction(() => document.getElementById('speed').textContent === '100 Mbps');
       await page.waitForFunction(() => document.querySelectorAll('.neighbor').length===2);
       assert.equal(await page.locator('#neighbors img,#neighbors script').count(),0);
@@ -43,6 +71,12 @@ const {status: statusFixture} = require('./fixtures.cjs');
       assert.match(await page.locator('#neighbors').innerText(),/Unavailable/);
       assert.equal(await page.locator('#ip').textContent(), 'Not configured');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow');
+      const report=await saveReport();
+      assert.equal(report.stale,false);
+      assert.equal(report.firmware,'0.5.0');
+      assert.equal(Object.hasOwn(report.ethernet,'mac'),false);
+      assert.equal(Object.hasOwn(report.switch_info.neighbors[0],'name'),false);
+      assert.equal(actions,0);
       await page.locator('#dhcp-start').click();
       await page.waitForFunction(()=>document.getElementById('dhcp-ip').textContent==='192.0.2.7');
       assert.equal(await page.locator('#dhcp-start').isDisabled(),true);
@@ -73,6 +107,14 @@ const {status: statusFixture} = require('./fixtures.cjs');
       await page.waitForFunction(() => document.getElementById('connection').textContent.includes('Tester unreachable'));
       assert.ok(await page.locator('#data').evaluate(el => el.classList.contains('stale-data')));
       await page.screenshot({path: `tmp/browser-screenshots/dashboard-${name}-stale.png`, fullPage: true});
+      await page.locator('#report-identifiers').check();
+      const offline=await saveReport();
+      assert.equal(offline.stale,true);
+      assert.equal(offline.network_identifiers_included,true);
+      assert.equal(offline.ethernet.mac,'02:00:00:00:00:01');
+      assert.deepEqual(offline.switch_info.neighbors,[]);
+      assert.equal(Date.parse(offline.exported_at)-Date.parse(offline.snapshot_received_at),offline.snapshot_age_ms);
+      assert.equal(actions,2);
       online = true; down = false; expired=false;
       await page.waitForFunction(() => document.getElementById('speed').textContent === '100 Mbps' &&
         !document.getElementById('data').classList.contains('stale-data'));
