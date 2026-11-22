@@ -164,6 +164,13 @@ For technical details, verification scope, and known limitations:
 
 This remains a personal project and a work in progress. Contributions and suggestions grounded in real troubleshooting needs are welcome.
 
+For questions, feedback, or collaboration regarding Syndetis:
+
+**Email:** projects.theo79@gmail.com
+
+You can also open a GitHub Issue for bug reports,
+feature requests, or technical discussions.
+
 ## License
 
 Syndetis source code is released under the **MIT License**. See [LICENSE](LICENSE).
