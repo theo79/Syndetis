@@ -22,8 +22,20 @@
 #include "esp_timer.h"
 
 enum { MENU, LINK_INFO, SWITCH_MENU, SWITCH_STATUS, SWITCH_NEIGHBOR, DEVICE_INFO, WEB_MENU, WEB_DETAILS, ABOUT, TESTS_MENU, DHCP_MENU, DHCP_RESULTS,
-       SETTINGS, UPDATE_DETAILS, MANUAL_MENU, MANUAL_IP_EDIT, MANUAL_PREFIX_EDIT, MANUAL_GATEWAY_EDIT, MANUAL_GATEWAY_MENU, MANUAL_REVIEW, MANUAL_RESULTS,
+       SETTINGS, UPDATE_DETAILS, DIAGNOSTIC_REPORT, MANUAL_MENU, MANUAL_IP_EDIT, MANUAL_PREFIX_EDIT, MANUAL_GATEWAY_EDIT, MANUAL_GATEWAY_MENU, MANUAL_REVIEW, MANUAL_RESULTS,
        PING_MENU, PING_NO_IP, PING_CUSTOM, PING_REVIEW, PING_RESULTS };
+static const struct { const char *label; int page; } main_items[] = {
+    {"Link & IP", LINK_INFO},
+    {"Switch Info", SWITCH_MENU},
+    {"Network Tests", TESTS_MENU},
+    {"Device Info", DEVICE_INFO},
+    {"Web Access", WEB_MENU},
+    {"About", ABOUT},
+    {"Settings", SETTINGS},
+    {"Diagnostic Report", DIAGNOSTIC_REPORT},
+};
+static const int main_item_count = sizeof(main_items) / sizeof(main_items[0]);
+
 static int page, selection, web_selection, switch_selection, neighbor_index, top;
 static char lines[128][21];
 static int line_count;
@@ -295,6 +307,18 @@ static void information_lines(const app_status_t *status)
     else if (page == LINK_INFO) link_lines(&status->ethernet);
     else if (page == SWITCH_STATUS || page == SWITCH_NEIGHBOR) switch_lines();
     else if (page == WEB_DETAILS) web_lines(&status->web);
+    else if (page == DIAGNOSTIC_REPORT) {
+        line_count = 0;
+        add_line("Diagnostic Report");
+        if (status->web.state == WEB_ON) {
+            add_line("%s", WEB_URL);
+            add_line("Report on dashboard");
+        } else {
+            add_line("%s", status->web.state == WEB_OFF ? "Enable Web Access" : "Check Web Access");
+            add_line("from the main menu");
+        }
+        add_line("OK / Hold OK: Back");
+    }
     else if (page == DHCP_RESULTS || page == MANUAL_RESULTS) { line_count = 0; dhcp_lines(true); }
     else {
         line_count = 0;
@@ -484,10 +508,9 @@ void ui_input(uint8_t buttons)
     }
     if (page == MENU) {
         if (buttons == BUTTON_UP && selection > 0) --selection;
-        if (buttons == BUTTON_DOWN && selection < 6) ++selection;
+        if (buttons == BUTTON_DOWN && selection + 1 < main_item_count) ++selection;
         if (buttons == BUTTON_OK) {
-            const int pages[] = {LINK_INFO, SWITCH_MENU, TESTS_MENU, DEVICE_INFO, WEB_MENU, ABOUT, SETTINGS};
-            page = pages[selection];
+            page = main_items[selection].page;
             top = 0;
             if (page == SETTINGS) settings_selection = 0;
             if (page == WEB_MENU) web_selection = 0;
@@ -757,11 +780,10 @@ void ui_draw(void)
     else if (page >= PING_MENU) ping_draw();
     else if (page >= MANUAL_MENU && page != MANUAL_RESULTS) manual_draw();
     else if (page == MENU || page == WEB_MENU || page == TESTS_MENU || page == DHCP_MENU) {
-        const char *main_items[] = {"Link & IP", "Switch Info", "Network Tests", "Device Info", "Web Access", "About", "Settings"};
         const char *web_menu_items[3];
         const char *tests_items[] = {"DHCP Test", "Manual IP", "PING", "Back"};
         const char *dhcp_items[] = {"Start", "Status / Results", "Stop / Release", "Back"};
-        int count = page == MENU ? 7 : page == TESTS_MENU ? 4 : page == DHCP_MENU ? 4 : web_items(&status.web, web_menu_items);
+        int count = page == MENU ? main_item_count : page == TESTS_MENU ? 4 : page == DHCP_MENU ? 4 : web_items(&status.web, web_menu_items);
         if (web_selection >= count) web_selection = count - 1;
         int selected_index = page == MENU ? selection : page == TESTS_MENU ? tests_selection : page == DHCP_MENU ? dhcp_selection : web_selection;
         int first = selected_index >= 4 ? selected_index - 3 : 0;
@@ -769,7 +791,7 @@ void ui_draw(void)
             int i = first + row;
             bool selected = i == selected_index;
             if (selected) display_rect(0, 16 + 12 * row, 123, 12, true, true);
-            display_text(3, 18 + 12 * row, page == MENU ? main_items[i] : page == TESTS_MENU ? tests_items[i] : page == DHCP_MENU ? dhcp_items[i] : web_menu_items[i], 1, !selected);
+            display_text(3, 18 + 12 * row, page == MENU ? main_items[i].label : page == TESTS_MENU ? tests_items[i] : page == DHCP_MENU ? dhcp_items[i] : web_menu_items[i], 1, !selected);
         }
         scrollbar(first, count, 4);
     } else if (page == SWITCH_MENU) {

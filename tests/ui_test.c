@@ -66,9 +66,77 @@ void display_text(int x,int y,const char *s,int scale,bool on) {
     CHECK(x+(int)strlen(s)*6*scale-scale<=128);
 }
 
+static void diagnostic_report_test(void)
+{
+    const struct { const char *label; int page; } previous_entries[] = {
+        {"Link & IP", LINK_INFO},
+        {"Switch Info", SWITCH_MENU},
+        {"Network Tests", TESTS_MENU},
+        {"Device Info", DEVICE_INFO},
+        {"Web Access", WEB_MENU},
+        {"About", ABOUT},
+        {"Settings", SETTINGS},
+    };
+    const struct { web_state_t state; const char *message; const char *detail; } states[] = {
+        {WEB_OFF, "Enable Web Access", "from the main menu"},
+        {WEB_ON, WEB_URL, "Report on dashboard"},
+        {WEB_STARTING, "Check Web Access", "from the main menu"},
+        {WEB_STOPPING, "Check Web Access", "from the main menu"},
+        {WEB_ERROR, "Check Web Access", "from the main menu"},
+    };
+
+    ui_init();
+    for (unsigned i = 0; i < sizeof(previous_entries) / sizeof(previous_entries[0]); ++i) {
+        ui_draw();
+        CHECK(selection == (int)i && strstr(frame_text, previous_entries[i].label));
+        ui_input(BUTTON_OK);
+        CHECK(page == previous_entries[i].page);
+        ui_input(BUTTON_BACK);
+        CHECK(page == MENU && selection == (int)i);
+        ui_input(BUTTON_DOWN);
+    }
+    CHECK(selection == 7);
+    ui_input(BUTTON_DOWN);
+    CHECK(selection == 7);
+    ui_draw();
+    CHECK(strstr(frame_text, "Diagnostic Report"));
+
+    ui_input(BUTTON_OK);
+    CHECK(page == DIAGNOSTIC_REPORT && top == 0 && !ui_editing());
+    for (unsigned i = 0; i < sizeof(states) / sizeof(states[0]); ++i) {
+        fixture.web.state = states[i].state;
+        ui_draw();
+        char body[85];
+        snprintf(body, sizeof(body), "Diagnostic Report\n%s\n%s\nOK / Hold OK: Back\n",
+                 states[i].message, states[i].detail);
+        CHECK(line_count == 4 && strstr(frame_text, body));
+        CHECK((strstr(frame_text, WEB_URL) != NULL) == (states[i].state == WEB_ON));
+        ui_input(BUTTON_UP);
+        ui_input(BUTTON_DOWN);
+        CHECK(page == DIAGNOSTIC_REPORT && top == 0);
+    }
+    ui_input(BUTTON_OK);
+    CHECK(page == MENU && selection == 7);
+    ui_input(BUTTON_OK);
+    CHECK(page == DIAGNOSTIC_REPORT);
+    ui_input(BUTTON_BACK);
+    CHECK(page == MENU && selection == 7);
+    ui_input(BUTTON_UP);
+    ui_input(BUTTON_OK);
+    CHECK(page == SETTINGS);
+
+    CHECK(enables == 0 && disables == 0 && update_opens == 0 && update_cancels == 0);
+    CHECK(starts == 0 && stops == 0 && cancels == 0);
+    CHECK(manual_applies == 0 && manual_cancels == 0 && uses_dhcp == 0);
+    CHECK(ping_starts == 0 && ping_cancels == 0);
+    fixture.web.state = WEB_OFF;
+}
+
 int main(void)
 {
     fixture.ethernet.state=ETH_READY;fixture.web.state=WEB_OFF;
+    diagnostic_report_test();
+    puts("PASS: Diagnostic Report menu, Back gestures, Web states, display bounds and no diagnostic actions");
     ui_init();selection=6;ui_input(BUTTON_OK);CHECK(page==SETTINGS);
     ui_input(BUTTON_OK);CHECK(page==UPDATE_DETAILS&&update_opens==1);
     update_fixture.state=OTA_AUTHORIZED;
