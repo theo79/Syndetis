@@ -2,7 +2,7 @@
 
 **A portable Ethernet diagnostic tool, built for troubleshooting in the field.**
 
-Syndetis is a small, ESP32-based project I've been building to make everyday Ethernet troubleshooting a little easier. It combines a wired network interface, a 128×64 OLED display, three buttons, and a local web dashboard in a battery-powered prototype.
+Syndetis is a small, ESP32-based project I've been building to make everyday Ethernet troubleshooting a little easier. It combines a wired network interface, a 128×64 OLED display, three buttons, and a local web dashboard in a prototype currently powered by a USB power bank.
 
 The idea is simple: connect to a network port, check what is happening, and get useful information without having to reach for a laptop every time.
 
@@ -92,7 +92,7 @@ The OLED **Diagnostic Report** item follows **Settings** in the main menu. It sh
 | Ethernet | LAN8720 RMII, 10/100 Mbps |
 | Display | SH1106 128×64 OLED, I²C |
 | Controls | Three buttons: UP, DOWN, OK |
-| Power | Portable battery-powered prototype |
+| Power | Regulated 5V USB power bank connected to WT32-ETH01 5V and GND pins |
 | Firmware | C with Espressif ESP-IDF v6.1 |
 
 Current GPIO assignments:
@@ -103,6 +103,42 @@ Current GPIO assignments:
 | UP / DOWN / OK | GPIO36 / GPIO39 / GPIO5 |
 
 The OLED address is detected at `0x3C` or `0x3D`. The authoritative pin mapping and board settings are in [`main/board.h`](main/board.h).
+
+### Wiring and assembly (current prototype)
+
+The current build uses a WT32-ETH01, an SH1106 128×64 I²C OLED, three active-low navigation buttons, and three external 10 kΩ pull-up resistors. It is powered from a **regulated 5V USB power bank output connected to the board's 5V and GND pins**, not through the board's USB connector.
+
+![Syndetis prototype wiring overview](docs/images/wiring_simple.png)
+
+[Open the full-size wiring overview](docs/images/wiring_simple.png)
+
+**OLED connections**
+
+| OLED pin | WT32-ETH01 connection |
+| --- | --- |
+| VCC | 3.3V |
+| GND | GND |
+| SDA | GPIO32 |
+| SCL | GPIO33 |
+
+**Button connections (active-low)**
+
+| Button | GPIO | External resistor | Switch connection |
+| --- | --- | --- | --- |
+| UP | GPIO36 | 10 kΩ from GPIO36 to board 3.3V | GPIO36 to GND when pressed |
+| DOWN | GPIO39 | 10 kΩ from GPIO39 to board 3.3V | GPIO39 to GND when pressed |
+| OK | GPIO5 | 10 kΩ from GPIO5 to board 3.3V | GPIO5 to GND when pressed |
+
+Each GPIO input should be held HIGH through its own **10 kΩ pull-up to the WT32-ETH01's 3.3V rail** and pulled LOW by its button when pressed. The three buttons share a common GND return. **Do not connect 3.3V directly to GND when a button is pressed.** GPIO36 and GPIO39 require external pull-ups; the firmware also disables internal pulls for all three buttons.
+
+**Power connections**
+
+| Power-bank output | WT32-ETH01 connection |
+| --- | --- |
+| Regulated +5V | 5V pin |
+| 0V / negative | GND pin |
+
+**Important:** Check the actual WT32-ETH01 module pin labels before making connections; the diagram is a simplified overview, not a pin-position-accurate schematic. Use only a suitable regulated 5V power source on the 5V input, and verify polarity and common ground before powering on. Never apply 5V to a GPIO or the 3.3V rail. The present prototype uses a power bank; it has no integrated battery charging circuit.
 
 This is still prototype hardware; a custom PCB and enclosure are potential future improvements.
 
