@@ -1,0 +1,46 @@
+name: Publish Syndetis v0.6.0
+on:
+  push:
+    paths:
+      - .github/workflows/publish-v0.6.0.yml
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish version tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.6.0 >/dev/null 2>&1; then
+            echo "Release v0.6.0 already exists; no changes made."
+            exit 0
+          fi
+          cat > /tmp/syndetis-release-notes.md <<'NOTES'
+          ## Syndetis v0.6.0 — Stable
+
+          This release adds a downloadable JSON diagnostic report to the local Wi-Fi web dashboard and a dedicated Diagnostic Report entry on the SH1106 OLED.
+
+          ### What's new
+          - JSON report exported directly from the browser after receiving a valid status snapshot.
+          - Firmware, Ethernet link/speed/duplex, DHCP, and LLDP/CDP diagnostic data included when available.
+          - Network identifiers excluded by default and included only with explicit opt-in.
+          - Snapshot age, stale/offline state, and browser UTC export timestamps recorded.
+          - OLED Diagnostic Report screen directs users to the dashboard; Wi-Fi remains explicitly user-controlled.
+
+          ### Compatibility
+          - Hardware: WT32-ETH01 (ESP32 / LAN8720, 10/100 Mbps)
+          - Display: SH1106 128×64 OLED
+          - SDK: ESP-IDF v6.1
+
+          ### Validation
+          The project owner reports successful physical hardware testing and JSON report export. The source and automated test history are documented in the repository.
+
+          ### Firmware binary
+          No compiled firmware image is attached to this release. Build from source using the pinned ESP-IDF v6.1 environment and the instructions in README.md. Do not flash a source archive or reuse an old partition layout as a firmware update.
+          NOTES
+          gh release create v0.6.0 --target "$TARGET_SHA" --title "Syndetis v0.6.0 — Stable" --notes-file /tmp/syndetis-release-notes.md --latest
