@@ -1,11 +1,20 @@
 #pragma once
-// Linux host-only ESP-IDF I/O boundary for exercising actual OTA adapters.
+// Host-only ESP-IDF I/O boundary for exercising actual OTA adapters.
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+static inline int inet_aton(const char *text, struct in_addr *address)
+{
+    return inet_pton(AF_INET, text, address) == 1;
+}
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 typedef int esp_err_t;
 #define ESP_OK 0
 #define ESP_FAIL -1

@@ -54,3 +54,6 @@ void wired_update_extend(void);
 void wired_update_release(void);
 
 bool wired_worker_healthy(void);
+bool wired_profinet_reserve(void);
+bool wired_profinet_valid(void);
+void wired_profinet_release(void);

@@ -14,6 +14,10 @@ bool dhcp_test_request(bool start){(void)start;++dhcp_requests;return request_ok
 bool dashboard_hotspot_request(httpd_req_t*r){return !r->denied;}
 static const char *response;
 static int response_length;
+static char chunks[60000];
+static dcp_inventory_t scan_fixture;
+dcp_summary_t profinet_summary(void) { return scan_fixture.summary; }
+void profinet_snapshot(dcp_inventory_t *out) { *out = scan_fixture; }
 const unsigned char dashboard_html_start[2] = {0}, dashboard_html_end[2] = {0};
 
 bool discovery_snapshot(neighbor_table_t *out) { *out=fixture; return true; }
@@ -22,11 +26,21 @@ const char *status_ethernet_state_name(ethernet_state_t state) { (void)state; re
 esp_err_t httpd_resp_send(httpd_req_t *r,const char *body,int n) {
     (void)r;response=body;response_length=n;return 0;
 }
+esp_err_t httpd_resp_send_chunk(httpd_req_t *r,const char *body,size_t n) {
+    (void)r;
+    if (!body) return ESP_OK;
+    if (n > sizeof(chunks) - response_length) return ESP_FAIL;
+    memcpy(chunks + response_length, body, n);
+    response = chunks;
+    response_length += (int)n;
+    return ESP_OK;
+}
 static void fill(char *s,size_t n,char c) { memset(s,c,n-1);s[n-1]=0; }
 static int emit(void)
 {
     httpd_req_t request={0};
-    if(status_get_handler(&request)!=ESP_OK||response_length<=0||response_length>=16384)return 1;
+    response_length=0;
+    if(status_get_handler(&request)!=ESP_OK||response_length<=0||response_length>=(int)sizeof(chunks))return 1;
     fwrite(response,1,response_length,stdout);putchar('\n');return 0;
 }
 int main(void)
@@ -43,12 +57,28 @@ int main(void)
     dhcp_fixture.error=ESP_FAIL;strcpy(dhcp_fixture.error_step,"primary API");
     dhcp_fixture.cleanup_error=true;dhcp_fixture.cleanup_code=0x5001;
     strcpy(dhcp_fixture.cleanup_step,"cleanup \"API\"");
+    dcp_begin(&scan_fixture, 123, 1000);
+    for (unsigned i = 0; i < DCP_CAPACITY; ++i) {
+        dcp_device_t device = {
+            .mac = {2,0,0,0,2,i}, .fields = DCP_NAME|DCP_VENDOR|DCP_IP|DCP_ROLE|DCP_ID,
+            .ip = {192,0,2,2}, .mask = {255,255,255,0}, .gateway = {192,0,2,1},
+            .vendor_id = 1024, .device_id = 4096, .role = 3, .ip_info = 0x81
+        };
+        fill(device.name,sizeof(device.name),'"');
+        fill(device.vendor,sizeof(device.vendor),'\\');
+        dcp_observe(&scan_fixture,&device);
+    }
+    dcp_finish(&scan_fixture.summary, DCP_COMPLETE, 1500);
     if(emit())return 1;
     fixture.records[0].fields=FIELD_CHASSIS|FIELD_PORT;
     fixture.records[1].name[0]=0;
     strcpy(fixture.records[2].description,"<script>\"quoted\"\\line\n</script>");
+    scan_fixture.devices[0].fields = DCP_NAME;
+    strcpy(scan_fixture.devices[0].name, "<img src=x>");
+    dcp_link_down(&scan_fixture.summary, 1800);
     if(emit())return 1;
     dhcp_fixture=(dhcp_status_t){.state=MANUAL_ACTIVE,.active=true,.mode=WIRED_MANUAL,.prefix=24};
     strcpy(dhcp_fixture.ip,"192.168.10.250");strcpy(dhcp_fixture.mask,"255.255.255.0");
+    scan_fixture = (dcp_inventory_t){0};
     return emit();
 }

@@ -10,6 +10,7 @@
 #include "network_ping.h"
 #include "ota_update.h"
 #include "ota_http_policy.h"
+#include "profinet.h"
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -23,10 +24,12 @@
 
 enum { MENU, LINK_INFO, SWITCH_MENU, SWITCH_STATUS, SWITCH_NEIGHBOR, DEVICE_INFO, WEB_MENU, WEB_DETAILS, ABOUT, TESTS_MENU, DHCP_MENU, DHCP_RESULTS,
        SETTINGS, UPDATE_DETAILS, DIAGNOSTIC_REPORT, MANUAL_MENU, MANUAL_IP_EDIT, MANUAL_PREFIX_EDIT, MANUAL_GATEWAY_EDIT, MANUAL_GATEWAY_MENU, MANUAL_REVIEW, MANUAL_RESULTS,
-       PING_MENU, PING_NO_IP, PING_CUSTOM, PING_REVIEW, PING_RESULTS };
+       PING_MENU, PING_NO_IP, PING_CUSTOM, PING_REVIEW, PING_RESULTS,
+       PROFINET_MENU, PROFINET_PROGRESS, PROFINET_RESULTS, PROFINET_DEVICE };
 static const struct { const char *label; int page; } main_items[] = {
     {"Link & IP", LINK_INFO},
     {"Switch Info", SWITCH_MENU},
+    {"PROFINET", PROFINET_MENU},
     {"Network Tests", TESTS_MENU},
     {"Device Info", DEVICE_INFO},
     {"Web Access", WEB_MENU},
@@ -51,6 +54,8 @@ static uint32_t ping_custom;
 static int ping_selection, ping_review_selection, ping_result_selection;
 static bool ping_gateway;
 static const char *ping_notice;
+static unsigned profinet_selection, profinet_index;
+static const char *profinet_notice;
 
 void ui_draw_splash(int64_t elapsed_ms)
 {
@@ -478,6 +483,36 @@ static void ping_input(uint8_t buttons)
     }
 }
 
+static void profinet_input(uint8_t buttons)
+{
+    dcp_summary_t scan = profinet_summary();
+    if (buttons & BUTTON_BACK) {
+        if (page == PROFINET_PROGRESS && dcp_active(scan.state)) profinet_cancel();
+        page = page == PROFINET_MENU ? MENU :
+               page == PROFINET_DEVICE || page == PROFINET_PROGRESS ? PROFINET_RESULTS : PROFINET_MENU;
+        top = 0;
+        return;
+    }
+    if (page == PROFINET_MENU) {
+        if (buttons == BUTTON_UP && profinet_selection) --profinet_selection;
+        if (buttons == BUTTON_DOWN && profinet_selection < 2) ++profinet_selection;
+        if (buttons != BUTTON_OK) return;
+        if (profinet_selection == 2) page = MENU;
+        else if (profinet_selection == 1) { page = PROFINET_RESULTS; profinet_index = 0; }
+        else {
+            profinet_notice = profinet_start();
+            if (!profinet_notice) { page = PROFINET_PROGRESS; profinet_index = 0; }
+        }
+    } else if (page == PROFINET_RESULTS) {
+        if (buttons == BUTTON_UP && profinet_index) --profinet_index;
+        if (buttons == BUTTON_DOWN && profinet_index + 1 < scan.count) ++profinet_index;
+        if (buttons == BUTTON_OK && profinet_index < scan.count) { page = PROFINET_DEVICE; top = 0; }
+    } else if (page == PROFINET_DEVICE) {
+        if (buttons == BUTTON_UP && top) --top;
+        if (buttons == BUTTON_DOWN && top + 3 < line_count) ++top;
+    }
+}
+
 void ui_input(uint8_t buttons)
 {
     app_status_t status = status_get();
@@ -491,8 +526,9 @@ void ui_input(uint8_t buttons)
     if(page==UPDATE_DETAILS && (buttons & BUTTON_BACK || buttons==BUTTON_OK)) {
         ota_update_cancel();page=SETTINGS;top=0;return;
     }
-    if (page >= PING_MENU) { ping_input(buttons); return; }
-    if (page >= MANUAL_MENU) { manual_input(buttons); return; }
+    if (page >= PROFINET_MENU && page <= PROFINET_DEVICE) { profinet_input(buttons); return; }
+    if (page >= PING_MENU && page <= PING_RESULTS) { ping_input(buttons); return; }
+    if (page >= MANUAL_MENU && page <= MANUAL_RESULTS) { manual_input(buttons); return; }
     if (buttons & (BUTTON_UP_REPEAT | BUTTON_DOWN_REPEAT)) return;
     if (buttons & BUTTON_BACK) {
         if (page == DHCP_RESULTS || page == DHCP_MENU) {
@@ -515,6 +551,7 @@ void ui_input(uint8_t buttons)
             if (page == SETTINGS) settings_selection = 0;
             if (page == WEB_MENU) web_selection = 0;
             if (page == SWITCH_MENU) switch_selection = 0;
+            if (page == PROFINET_MENU) { profinet_selection = 0; profinet_notice = NULL; }
             if (page == TESTS_MENU) tests_selection = 0;
         }
     } else if (page == TESTS_MENU) {
@@ -753,6 +790,95 @@ static void draw_update_progress(const ota_update_status_t *u)
     progress_frame_valid=true;progress_frame_state=u->state;progress_frame_percent=percent;
     snprintf(progress_frame_message,sizeof(progress_frame_message),"%s",u->message);
 }
+static void profinet_draw(void)
+{
+    dcp_summary_t scan = profinet_summary();
+    char label[21];
+    if (page == PROFINET_PROGRESS) {
+        if (dcp_active(scan.state)) {
+            uint64_t now = esp_timer_get_time() / 1000;
+            unsigned seconds = scan.state == DCP_STARTING ? DCP_WINDOW_MS / 1000 :
+                scan.deadline_ms > now ? (scan.deadline_ms - now + 999) / 1000 : 0;
+            display_text(2, 18, "Discovering...", 1, true);
+            snprintf(label, sizeof(label), "Devices found: %u", scan.count);
+            display_text(2, 30, label, 1, true);
+            snprintf(label, sizeof(label), "Remaining: %u s", seconds);
+            display_text(2, 42, label, 1, true);
+            display_text(2, 54, "Hold OK: Cancel", 1, true);
+            return;
+        }
+        page = PROFINET_RESULTS;
+    }
+    if (page == PROFINET_MENU) {
+        const char *items[] = {"Start discovery", "View results", "Back"};
+        for (unsigned i = 0; i < 3; ++i) {
+            bool selected = i == profinet_selection;
+            if (selected) display_rect(0, 16 + 12 * i, 123, 12, true, true);
+            display_text(3, 18 + 12 * i, items[i], 1, !selected);
+        }
+        display_text(2, 54, profinet_notice ? profinet_notice : "PROFINET DCP", 1, true);
+    } else if (page == PROFINET_RESULTS) {
+        snprintf(label, sizeof(label), "%u %s", scan.count,
+                 !scan.valid && scan.started_ms ? "historical" : dcp_partial(&scan) ? "found - partial" : "devices found");
+        if (scan.overflow) {
+            if (scan.valid) snprintf(label, sizeof(label), "%u found - overflow", scan.count);
+            else snprintf(label, sizeof(label), "%u historical - full", scan.count);
+        }
+        display_text(2, 18, label, 1, true);
+        if (!scan.count) {
+            display_text(2, 30, scan.started_ms ? "No devices found" : "No discovery yet", 1, true);
+            display_text(2, 42, dcp_state_name(scan.state), 1, true);
+            display_text(2, 54, "Hold OK: Back", 1, true);
+            return;
+        }
+        if (profinet_index >= scan.count) profinet_index = scan.count - 1;
+        unsigned first = profinet_index >= 3 ? profinet_index - 2 : 0;
+        for (unsigned i = first; i < scan.count && i < first + 3; ++i) {
+            dcp_device_t device;
+            if (!profinet_device(scan.xid, i, &device)) break;
+            if (device.name[0]) snprintf(label, sizeof(label), "%.20s", device.name);
+            else snprintf(label, sizeof(label), "%02X:%02X:%02X:%02X:%02X:%02X",
+                          device.mac[0], device.mac[1], device.mac[2], device.mac[3], device.mac[4], device.mac[5]);
+            bool selected = i == profinet_index;
+            if (selected) display_rect(0, 28 + 12 * (i - first), 123, 12, true, true);
+            display_text(3, 30 + 12 * (i - first), label, 1, !selected);
+        }
+        scrollbar(first, scan.count, 3);
+    } else {
+        dcp_device_t d;
+        line_count = 0;
+        if (profinet_device(scan.xid, profinet_index, &d)) {
+            add_line("Station name:");
+            add_line("%s", !(d.fields & DCP_NAME) ? "Unavailable" : d.name[0] ? d.name : "Empty");
+            add_line("Source MAC:");
+            add_line("%02X:%02X:%02X:%02X:%02X:%02X", d.mac[0], d.mac[1], d.mac[2], d.mac[3], d.mac[4], d.mac[5]);
+            add_line("Device type:");
+            add_line("%s", !(d.fields & DCP_VENDOR) ? "Unavailable" : d.vendor[0] ? d.vendor : "Empty");
+            if (d.fields & DCP_IP) {
+                add_line("IPv4:"); add_line("%u.%u.%u.%u", d.ip[0], d.ip[1], d.ip[2], d.ip[3]);
+                add_line("Mask:"); add_line("%u.%u.%u.%u", d.mask[0], d.mask[1], d.mask[2], d.mask[3]);
+                add_line("Gateway:"); add_line("%u.%u.%u.%u", d.gateway[0], d.gateway[1], d.gateway[2], d.gateway[3]);
+                add_line("IP status: 0x%04X", d.ip_info);
+                add_line("%s", dcp_ip_status_name(d.ip_info));
+                if (d.ip_info & 0x80) add_line("Reported IP conflict");
+            } else add_line("IPv4: unavailable");
+            if (d.fields & DCP_ID) { add_line("Vendor ID: 0x%04X", d.vendor_id); add_line("Device ID: 0x%04X", d.device_id); }
+            else add_line("IDs: unavailable");
+            if (d.fields & DCP_ROLE) add_line("Role flags: 0x%02X", d.role);
+            else add_line("Role: unavailable");
+            if (d.duplicate_name) add_line("Duplicate name");
+            if (d.duplicate_ip) add_line("Duplicate IPv4");
+            if (d.text_limited) add_line("Text limited");
+        } else add_line("Device unavailable");
+        add_line("Hold OK: Back");
+        display_text(2, 18, scan.valid ? "PROFINET device" : "Historical device", 1, true);
+        if (top + 3 > line_count) top = line_count > 3 ? line_count - 3 : 0;
+        for (int i = 0; i < 3 && top + i < line_count; ++i)
+            display_text(2, 30 + 12 * i, lines[top + i], 1, true);
+        scrollbar(top, line_count, 3);
+    }
+}
+
 void ui_draw(void)
 {
     app_status_t status = status_get();
@@ -777,8 +903,9 @@ void ui_draw(void)
             display_text(3,18+12*i,items[i],1,!selected);
         }
     }
-    else if (page >= PING_MENU) ping_draw();
-    else if (page >= MANUAL_MENU && page != MANUAL_RESULTS) manual_draw();
+    else if (page >= PROFINET_MENU && page <= PROFINET_DEVICE) profinet_draw();
+    else if (page >= PING_MENU && page <= PING_RESULTS) ping_draw();
+    else if (page >= MANUAL_MENU && page < MANUAL_RESULTS) manual_draw();
     else if (page == MENU || page == WEB_MENU || page == TESTS_MENU || page == DHCP_MENU) {
         const char *web_menu_items[3];
         const char *tests_items[] = {"DHCP Test", "Manual IP", "PING", "Back"};

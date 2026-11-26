@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-# Migration-only guards. Application sources and version remain unchanged.
+# Build guards for the reviewed target and SDK.
 set(IDF_TARGET "esp32" CACHE STRING "Syndetis target")
 if(NOT IDF_TARGET STREQUAL "esp32")
     message(FATAL_ERROR "Syndetis5C requires ESP32")
@@ -17,5 +17,5 @@ if(NOT EXISTS "${SDKCONFIG}")
 endif()
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 idf_build_set_property(MINIMAL_BUILD ON)
-set(PROJECT_VER "0.6.0")
+set(PROJECT_VER "0.7.0")
 project(Syndetis)

@@ -4,6 +4,8 @@
 #include "dhcp_test.h"
 #include "network_policy.h"
 #include "web_guard.h"
+#include "profinet.h"
+#include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -92,6 +94,55 @@ static void switch_json(json_writer_t *w, ethernet_state_t eth_state)
     json_add(w, "]}");
 }
 
+static const char *json_bool(bool value) { return value ? "true" : "false"; }
+
+static void optional_number(json_writer_t *w, unsigned value, bool present)
+{
+    if (present) json_add(w, "%u", value); else json_add(w, "null");
+}
+
+static void optional_ipv4(json_writer_t *w, const uint8_t ip[4], bool present)
+{
+    if (present) json_add(w, "\"%u.%u.%u.%u\"", ip[0], ip[1], ip[2], ip[3]);
+    else json_add(w, "null");
+}
+
+static void profinet_json_header(json_writer_t *w, const dcp_summary_t *s)
+{
+    uint64_t now = esp_timer_get_time() / 1000;
+    json_add(w, ",\"profinet\":{\"state\":\"%s\",\"device_count\":%u,\"capacity\":%d,"
+                "\"valid\":%s,\"completion\":\"%s\",\"age_ms\":",
+             dcp_state_name(s->state), s->count, DCP_CAPACITY, json_bool(s->valid),
+             !s->started_ms ? "unavailable" : dcp_active(s->state) ? "pending" :
+             dcp_partial(s) ? "partial" : "complete");
+    if (s->started_ms) json_add(w, "%" PRIu64, now >= s->started_ms ? now - s->started_ms : 0);
+    else json_add(w, "null");
+    json_add(w, ",\"error_code\":%d,\"overflow\":%" PRIu32 ",\"malformed\":%" PRIu32
+                ",\"queue_drops\":%" PRIu32 ",\"duplicate_name\":%s,\"duplicate_ip\":%s,"
+                "\"reported_ip_conflict\":%s,\"text_limited\":%s,\"devices\":[",
+             s->error_code, s->overflow, s->malformed, s->queue_drops,
+             json_bool(s->duplicate_name), json_bool(s->duplicate_ip),
+             json_bool(s->reported_conflict), json_bool(s->text_limited));
+}
+
+static void profinet_json_device(json_writer_t *w, const dcp_device_t *d, unsigned index)
+{
+    const uint8_t *m = d->mac;
+    json_add(w, "%s{\"source_mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\",\"station_name\":",
+             index ? "," : "", m[0], m[1], m[2], m[3], m[4], m[5]);
+    json_string(w, d->name, d->fields & DCP_NAME);
+    json_add(w, ",\"device_type\":"); json_string(w, d->vendor, d->fields & DCP_VENDOR);
+    json_add(w, ",\"ip\":"); optional_ipv4(w, d->ip, d->fields & DCP_IP);
+    json_add(w, ",\"mask\":"); optional_ipv4(w, d->mask, d->fields & DCP_IP);
+    json_add(w, ",\"gateway\":"); optional_ipv4(w, d->gateway, d->fields & DCP_IP);
+    json_add(w, ",\"ip_status\":"); optional_number(w, d->ip_info, d->fields & DCP_IP);
+    json_add(w, ",\"vendor_id\":"); optional_number(w, d->vendor_id, d->fields & DCP_ID);
+    json_add(w, ",\"device_id\":"); optional_number(w, d->device_id, d->fields & DCP_ID);
+    json_add(w, ",\"role_flags\":"); optional_number(w, d->role, d->fields & DCP_ROLE);
+    json_add(w, ",\"duplicate_name\":%s,\"duplicate_ip\":%s,\"text_limited\":%s}",
+             json_bool(d->duplicate_name), json_bool(d->duplicate_ip), json_bool(d->text_limited));
+}
+
 static esp_err_t status_get_handler(httpd_req_t *request)
 {
     if (!dashboard_hotspot_request(request))
@@ -144,12 +195,40 @@ static esp_err_t status_get_handler(httpd_req_t *request)
     json_string(&writer, dhcp.cleanup_step, dhcp.cleanup_error);
     json_add(&writer, "}");
     switch_json(&writer, eth->state);
-    json_add(&writer, "}");
-    if (writer.failed)
+    dcp_summary_t scan = profinet_summary();
+    dcp_inventory_t *inventory = scan.count ? malloc(sizeof(*inventory)) : NULL;
+    if (inventory) {
+        profinet_snapshot(inventory);
+        scan = inventory->summary;
+    }
+    // Preserve status and DHCP controls even if snapshot allocation fails.
+    if (scan.count && !inventory) json_add(&writer, ",\"profinet\":null}");
+    else {
+        profinet_json_header(&writer, &scan);
+        if (!scan.count) json_add(&writer, "]}}");
+    }
+    if (writer.failed) {
+        free(inventory);
         return httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR, "Status too large");
+    }
     response_headers(request);
     httpd_resp_set_type(request, "application/json");
-    return httpd_resp_send(request, json, writer.length);
+    if (!scan.count || !inventory) {
+        free(inventory);
+        return httpd_resp_send(request, json, writer.length);
+    }
+
+    // Reuse the existing buffer and hold no inventory lock during HTTP I/O.
+    esp_err_t result = httpd_resp_send_chunk(request, json, writer.length);
+    for (unsigned i = 0; result == ESP_OK && i < scan.count; ++i) {
+        writer.length = 0;
+        profinet_json_device(&writer, &inventory->devices[i], i);
+        result = writer.failed ? ESP_FAIL : httpd_resp_send_chunk(request, json, writer.length);
+    }
+    free(inventory);
+    if (result == ESP_OK) result = httpd_resp_send_chunk(request, "]}}", 3);
+    if (result == ESP_OK) result = httpd_resp_send_chunk(request, NULL, 0);
+    return result;
 }
 
 static esp_err_t dhcp_post(httpd_req_t *request)

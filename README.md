@@ -8,6 +8,8 @@ The idea is simple: connect to a network port, check what is happening, and get 
 
 **Current stable firmware:** [v0.6.0](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1
 
+**Development candidate:** v0.7.0 adds diagnostic-only PROFINET DCP discovery and awaits physical acceptance. See [wire format and lab acceptance](docs/PROFINET.md).
+
 ---
 
 ## Hardware & Interface Preview
@@ -32,6 +34,7 @@ The idea is simple: connect to a network port, check what is happening, and get 
 - Discover neighboring equipment through **LLDP** and **CDP**.
 - Display advertised switch/device identity, port, and VLAN information when available.
 - Listen for neighbor advertisements without starting an IPv4 test.
+- Discover responding PROFINET stations with an explicit DCP Identify All scan, even with wired IPv4 off (v0.7.0 candidate).
 
 ### Network diagnostics
 
@@ -64,13 +67,25 @@ By default, Syndetis does not start an IPv4 diagnostic session until you explici
 
 Use UP and DOWN to move through menus, press OK to select, and hold OK for approximately 500 ms to go back. Numeric editors support button repeat.
 
+Main menu order in v0.7.0 is **Link & IP**, **Switch Info**, **PROFINET**, **Network Tests**, **Device Info**, **Web Access**, **About**, **Settings**, **Diagnostic Report**.
+
+### PROFINET discovery
+
+1. Connect to an authorized diagnostic port. Wired IPv4 can stay off.
+2. On the OLED, select **PROFINET → Start discovery**. The tester sends one DCP Identify All request and listens for five seconds. Hold OK to cancel.
+3. Open **View results** to scroll the last inventory. Select a station to see its advertised details. Unnamed stations appear by MAC address. A three-second cooldown follows each scan.
+
+The inventory shows the source MAC and, when advertised, the station name, device type, IPv4 address, subnet mask, gateway, vendor and device IDs, role flags, and IP status. It flags potential duplicates within the sample and marks results historical after link loss. The dashboard displays the same discovery results and counters. Starting a scan requires the physical buttons.
+
+This is a diagnostic-only Layer 2 query. It never changes an external device or the tester’s IPv4 settings. Replies depend on device behavior and Layer 2 forwarding on the connected segment. The inventory can be incomplete, even when the response window finishes normally. Use the candidate on an authorized, isolated lab network during acceptance.
+
 ### Web dashboard
 
 From the device's main menu, select **Web Access → Enable**. Connect to the Wi-Fi network shown on the OLED using the displayed password, then open:
 
 **http://192.168.4.1/**
 
-The dashboard shows live Ethernet information, IP/DHCP state, and discovered switch information. Browser dashboard access is through the device's Wi-Fi hotspot, not its wired Ethernet address.
+The dashboard shows live Ethernet information, IP/DHCP state, discovered switch information, and PROFINET results. Browser dashboard access is through the device's Wi-Fi hotspot, not its wired Ethernet address.
 
 The prototype dashboard has no separate login once hotspot access is enabled. Use it on trusted networks and disable Web Access when you're finished.
 
@@ -82,7 +97,7 @@ The prototype dashboard has no separate login once hotspot access is enabled. Us
 
 The report includes firmware version and uptime, Ethernet initialization and link status, negotiated speed and duplex, wired addressing mode and state, DHCP status and timing, and LLDP/CDP discovery status, counters, neighbor protocol, TTL, age, and expiry. It includes Ethernet and DHCP error details when available. Ping statistics and device wall-clock timestamps are unavailable in the report.
 
-Network identifiers are omitted by default. Select **Include network identifiers** to include available MAC and IP addresses, subnet, gateway and DNS settings, and switch, chassis, port and VLAN details. These fields can reveal network topology when you share the file. Review reports before sharing them.
+Network identifiers are omitted by default. Select **Include network identifiers** to include available MAC and IP addresses, subnet, gateway and DNS settings, switch, chassis, port and VLAN details, and the PROFINET device inventory. The default PROFINET section contains scan state, count, age, validity, completion, error and drop counters, and aggregate conflict flags. These optional identifiers can reveal network topology when you share the file. Review reports before sharing them.
 
 The report uses the last valid dashboard snapshot and records browser UTC receipt and export times, snapshot age, and whether the data is stale. A failed status poll or a snapshot older than four seconds marks the data stale. You can still download it after disconnecting if the dashboard tab stays open and has received a valid update. Reloading or closing the page discards the cached snapshot.
 

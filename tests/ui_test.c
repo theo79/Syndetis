@@ -12,6 +12,22 @@ static char frame_text[4096];
 static int progress_fill;
 static ota_update_status_t update_fixture;
 static unsigned update_opens,update_cancels;
+static unsigned profinet_starts, profinet_cancels;
+static dcp_summary_t scan_fixture;
+static dcp_device_t scan_devices[2];
+dcp_summary_t profinet_summary(void) {return scan_fixture;}
+const char *profinet_start(void)
+{
+    ++profinet_starts;
+    scan_fixture = (dcp_summary_t){.state=DCP_STARTING,.started_ms=2000,.valid=true};
+    return NULL;
+}
+void profinet_cancel(void) { ++profinet_cancels; scan_fixture.state=DCP_CANCELLED; }
+bool profinet_device(uint32_t xid,unsigned index,dcp_device_t *out)
+{
+    if(xid!=scan_fixture.xid||index>=scan_fixture.count)return false;
+    *out=scan_devices[index];return true;
+}
 ota_update_status_t ota_update_status(void){return update_fixture;}
 bool ota_update_request_session(void){++update_opens;return true;}
 void ota_update_cancel(void){++update_cancels;}
@@ -71,6 +87,7 @@ static void diagnostic_report_test(void)
     const struct { const char *label; int page; } previous_entries[] = {
         {"Link & IP", LINK_INFO},
         {"Switch Info", SWITCH_MENU},
+        {"PROFINET", PROFINET_MENU},
         {"Network Tests", TESTS_MENU},
         {"Device Info", DEVICE_INFO},
         {"Web Access", WEB_MENU},
@@ -95,9 +112,9 @@ static void diagnostic_report_test(void)
         CHECK(page == MENU && selection == (int)i);
         ui_input(BUTTON_DOWN);
     }
-    CHECK(selection == 7);
+    CHECK(selection == 8);
     ui_input(BUTTON_DOWN);
-    CHECK(selection == 7);
+    CHECK(selection == 8);
     ui_draw();
     CHECK(strstr(frame_text, "Diagnostic Report"));
 
@@ -116,11 +133,11 @@ static void diagnostic_report_test(void)
         CHECK(page == DIAGNOSTIC_REPORT && top == 0);
     }
     ui_input(BUTTON_OK);
-    CHECK(page == MENU && selection == 7);
+    CHECK(page == MENU && selection == 8);
     ui_input(BUTTON_OK);
     CHECK(page == DIAGNOSTIC_REPORT);
     ui_input(BUTTON_BACK);
-    CHECK(page == MENU && selection == 7);
+    CHECK(page == MENU && selection == 8);
     ui_input(BUTTON_UP);
     ui_input(BUTTON_OK);
     CHECK(page == SETTINGS);
@@ -132,12 +149,44 @@ static void diagnostic_report_test(void)
     fixture.web.state = WEB_OFF;
 }
 
+static void profinet_menu_test(void)
+{
+    ui_init();
+    ui_input(BUTTON_DOWN);ui_input(BUTTON_DOWN);ui_input(BUTTON_OK);ui_draw();
+    CHECK(page==PROFINET_MENU && !profinet_starts && strstr(frame_text,"Start discovery"));
+    ui_input(BUTTON_DOWN);ui_input(BUTTON_OK);ui_draw();
+    CHECK(page==PROFINET_RESULTS && !profinet_starts && strstr(frame_text,"No discovery yet"));
+    ui_input(BUTTON_BACK);ui_input(BUTTON_UP);ui_input(BUTTON_OK);ui_draw();
+    CHECK(page==PROFINET_PROGRESS && profinet_starts==1 && strstr(frame_text,"Hold OK: Cancel"));
+    ui_input(BUTTON_OK);CHECK(page==PROFINET_PROGRESS && profinet_starts==1);
+    ui_input(BUTTON_BACK);ui_draw();
+    CHECK(page==PROFINET_RESULTS && profinet_cancels==1 && strstr(frame_text,"No devices found"));
+    scan_fixture.state=DCP_COMPLETE;
+    scan_fixture.count=2;
+    scan_fixture.overflow=1;
+    scan_devices[0].fields=DCP_NAME;
+    strcpy(scan_devices[0].name,"fixture-line-abcdefghijkl");
+    scan_devices[1].mac[0]=2;scan_devices[1].mac[5]=9;
+    ui_draw();
+    CHECK(strstr(frame_text,"2 found - overflow") && strstr(frame_text,"02:00:00:00:00:09"));
+    ui_input(BUTTON_DOWN);ui_input(BUTTON_OK);ui_draw();
+    CHECK(page==PROFINET_DEVICE && strstr(frame_text,"PROFINET device"));
+    ui_input(BUTTON_DOWN);CHECK(top==1);
+    scan_fixture.valid=false;ui_draw();
+    CHECK(strstr(frame_text,"Historical device"));
+    ui_input(BUTTON_BACK);ui_draw();
+    CHECK(page==PROFINET_RESULTS && strstr(frame_text,"2 historical"));
+    ui_input(BUTTON_BACK);ui_input(BUTTON_DOWN);ui_input(BUTTON_DOWN);ui_input(BUTTON_OK);
+    CHECK(page==MENU && selection==2 && profinet_starts==1);
+}
+
 int main(void)
 {
     fixture.ethernet.state=ETH_READY;fixture.web.state=WEB_OFF;
     diagnostic_report_test();
+    profinet_menu_test();
     puts("PASS: Diagnostic Report menu, Back gestures, Web states, display bounds and no diagnostic actions");
-    ui_init();selection=6;ui_input(BUTTON_OK);CHECK(page==SETTINGS);
+    ui_init();selection=7;ui_input(BUTTON_OK);CHECK(page==SETTINGS);
     ui_input(BUTTON_OK);CHECK(page==UPDATE_DETAILS&&update_opens==1);
     update_fixture.state=OTA_AUTHORIZED;
     strcpy(update_fixture.message,"Update mode active");
@@ -164,7 +213,7 @@ int main(void)
     ui_input(BUTTON_BACK);CHECK(page==SETTINGS&&update_cancels==1);
     ui_draw();ui_input(BUTTON_BACK);CHECK(page==MENU);
 
-    ui_init();selection=4;ui_input(BUTTON_BACK);CHECK(page==MENU&&selection==4);
+    ui_init();selection=5;ui_input(BUTTON_BACK);CHECK(page==MENU&&selection==5);
     ui_input(BUTTON_OK);CHECK(page==WEB_MENU);
     ui_input(BUTTON_BACK);CHECK(page==MENU&&enables==0&&disables==0);
     ui_input(BUTTON_OK);ui_input(BUTTON_OK);CHECK(enables==1&&fixture.web.state==WEB_ON);
@@ -194,7 +243,7 @@ int main(void)
     for(selection=0;selection<6;++selection)ui_draw();selection=0;
     ui_draw_splash(0);ui_draw_splash(900);ui_draw_splash(1400);
     CHECK(enables==1&&disables==1);
-    page=MENU;selection=2;ui_input(BUTTON_OK);CHECK(page==TESTS_MENU);
+    page=MENU;selection=3;ui_input(BUTTON_OK);CHECK(page==TESTS_MENU);
     ui_input(BUTTON_OK);CHECK(page==DHCP_MENU);ui_input(BUTTON_OK);CHECK(page==DHCP_RESULTS&&starts==1);
     ui_input(BUTTON_BACK);CHECK(page==DHCP_MENU&&cancels==1);
     dhcp_fixture.state=DHCP_ACQUIRED;dhcp_fixture.active=true;

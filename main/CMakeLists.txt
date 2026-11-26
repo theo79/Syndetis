@@ -1,6 +1,7 @@
 idf_component_register(SRCS "main.c" "display.c" "buttons.c" "ui.c"
                            "status.c" "ethernet.c" "services.c" "dashboard.c"
                            "neighbors.c" "discovery.c" "button_logic.c"
+                           "profinet.c" "profinet_dcp.c"
                            "dhcp_test.c" "network_policy.c" "web_guard.c" "manual_ipv4.c"
                            "network_ping.c" "ping_packet.c" "ota_engine.c" "ota_update.c" "ota_http_policy.c"
     INCLUDE_DIRS "."

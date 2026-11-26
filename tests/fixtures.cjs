@@ -5,6 +5,12 @@ exports.status = (down = false, expired = false) => ({
   ethernet: {initialization: 'Ready', error_code: 0, error_step: '',
     link: down ? 'Down' : 'Up', speed_mbps: down ? null : 100,
     duplex: down ? 'Unavailable' : 'Full', mac: '02:00:00:00:00:01', ip: 'Not configured'},
+  profinet: {state:'Finished',device_count:1,capacity:32,valid:!down,completion:'partial',
+    age_ms:5300,error_code:0,overflow:1,malformed:2,queue_drops:3,
+    duplicate_name:true,duplicate_ip:true,reported_ip_conflict:true,text_limited:false,
+    devices:[{source_mac:'02:00:00:00:02:01',station_name:'<img src=x onerror="window.injected=true">'+'long-name-'.repeat(19),
+      device_type:'Demo device',ip:'192.0.2.44',mask:'255.255.255.0',gateway:null,ip_status:129,
+      vendor_id:42,device_id:700,role_flags:3,duplicate_name:true,duplicate_ip:true,text_limited:false}]},
   switch_info: {state: down ? 'Link down' : expired ? 'Expired' : 'Received/current',
     observation_seconds: 30, capacity: 4, capacity_drops: 0, queue_drops: 0, limited_frames: 0, invalid_frames: 0,
     neighbors: down ? [] : [

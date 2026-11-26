@@ -16,6 +16,7 @@ typedef struct { const char *uri; int method; esp_err_t (*handler)(httpd_req_t *
 #define HTTPD_400_BAD_REQUEST 400
 #define HTTPD_500_INTERNAL_SERVER_ERROR 500
 esp_err_t httpd_resp_send(httpd_req_t *, const char *, int);
+esp_err_t httpd_resp_send_chunk(httpd_req_t *, const char *, size_t);
 int httpd_req_to_sockfd(httpd_req_t*);
 static inline void httpd_resp_set_hdr(httpd_req_t *r,const char *k,const char *v) {(void)r;(void)k;(void)v;}
 static inline void httpd_resp_set_type(httpd_req_t *r,const char *v) {(void)r;(void)v;}
