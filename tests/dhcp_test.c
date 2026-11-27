@@ -11,6 +11,7 @@ static void tracked_free(void *p){++frees;free(p);}
 #include "../main/receive_dispatch.h"
 #undef free
 int64_t test_time_us;
+void profinet_receive(const uint8_t *buffer, size_t length) { (void)buffer; (void)length; }
 static esp_netif_t fake;
 static int starts, releases, receives, observations, injected_error;
 static bool receive_fails, stop_fails;
@@ -102,7 +103,17 @@ int main(void){
     CHECK(!fake.up&&!fake.started&&starts==0);
     CHECK(transmit(NULL,NULL,0)==ESP_ERR_INVALID_STATE);
     CHECK(!dhcp_test_request(true)&&state.state==DHCP_CONNECT&&starts==0);
-    dhcp_test_link(true);start();CHECK(starts==1&&fake.started);
+    dhcp_test_link(true);
+    unsigned maintenance_generation;
+    manual_ipv4_t dcp_manual={.ip=0xc000020a,.prefix=24};
+    CHECK(wired_profinet_reserve() && wired_profinet_valid());
+    CHECK(!wired_profinet_reserve() && !dhcp_test_request(true) && !wired_use_dhcp());
+    CHECK(!wired_update_reserve(&maintenance_generation));
+    CHECK(wired_manual_apply(&dcp_manual,address_generation) && !state.active);
+    wired_profinet_release();
+    CHECK(wired_update_reserve(&maintenance_generation) && !wired_profinet_reserve());
+    wired_update_release();
+    start();CHECK(starts==1&&fake.started && !wired_profinet_reserve());
     CHECK(!resolver[1].addr&&!resolver[2].addr);
     resolver[0].addr=lwip_ntohl(0xc0000235);
     test_time_us+=1200000;address(0xc000020a,0xffffff00);step();

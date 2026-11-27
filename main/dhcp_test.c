@@ -42,7 +42,8 @@ static bool manual_watch, watch_probing;
 static uint32_t watch_ip;
 static unsigned watch_session;
 static bool ping_reserved, ping_window;
-static bool update_reserved;
+static bool update_reserved, profinet_reserved;
+static unsigned profinet_generation;
 static unsigned update_generation;
 static uint64_t worker_heartbeat;
 static uint64_t update_deadline;
@@ -249,7 +250,7 @@ bool dhcp_test_request(bool start)
 {
     uint64_t now = clock_ms();
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && !update_reserved && (start ? pending == CMD_NONE && !state.busy :
+    bool ok = initialized && !ping_reserved && !update_reserved && !profinet_reserved && (start ? pending == CMD_NONE && !state.busy :
                               pending != CMD_STOP && pending != CMD_CANCEL &&
                               (!state.busy || state.state == DHCP_REQUESTING));
     ok = ok && state.mode != WIRED_MANUAL && state.state != MANUAL_PROBING;
@@ -315,6 +316,7 @@ const char *wired_manual_apply(const manual_ipv4_t *config, unsigned review_gene
     const char *error = !initialized ? "Ethernet unavailable" : !link_up ? "Connect Ethernet" :
         update_reserved ? "Firmware update active" :
         ping_reserved ? "Ping active: cancel" :
+        profinet_reserved ? "PROFINET active" :
         review_generation != address_generation ? "Changed: review again" :
         state.cleanup_error ? "Retry Stop / Release" :
         pending != CMD_NONE || state.busy || state.state == MANUAL_PROBING ? "Operation active" :
@@ -353,7 +355,7 @@ bool wired_manual_cancel(void)
 bool wired_use_dhcp(void)
 {
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && !update_reserved && pending == CMD_NONE && !state.busy;
+    bool ok = initialized && !ping_reserved && !update_reserved && !profinet_reserved && pending == CMD_NONE && !state.busy;
     if (ok) {
         pending = CMD_STOP;
         manual_watch = false;
@@ -379,11 +381,43 @@ static uint32_t address_value(const char *p)
     }
     return result;
 }
+static bool address_stable_locked(void)
+{
+    return pending == CMD_NONE && !state.busy && !state.cleanup_error &&
+           state.state != DHCP_REQUESTING && state.state != MANUAL_PROBING;
+}
+
+bool wired_profinet_reserve(void)
+{
+    portENTER_CRITICAL(&lock);
+    bool ok = !profinet_reserved && !update_reserved && !ping_reserved && address_stable_locked();
+    if (ok) {
+        profinet_reserved = true;
+        profinet_generation = address_generation;
+    }
+    portEXIT_CRITICAL(&lock);
+    return ok;
+}
+
+bool wired_profinet_valid(void)
+{
+    portENTER_CRITICAL(&lock);
+    bool valid = profinet_reserved && profinet_generation == address_generation && address_stable_locked();
+    portEXIT_CRITICAL(&lock);
+    return valid;
+}
+
+void wired_profinet_release(void)
+{
+    portENTER_CRITICAL(&lock);
+    profinet_reserved = false;
+    portEXIT_CRITICAL(&lock);
+}
+
 bool wired_update_reserve(unsigned *generation)
 {
     portENTER_CRITICAL(&lock);
-    bool ok=initialized && !update_reserved && !ping_reserved && pending==CMD_NONE &&
-        !state.busy && !state.cleanup_error && state.state!=DHCP_REQUESTING && state.state!=MANUAL_PROBING;
+    bool ok=initialized && !update_reserved && !ping_reserved && !profinet_reserved && address_stable_locked();
     if(ok) {
         update_reserved=true;update_generation=address_generation;*generation=address_generation;
         update_local=address_value(state.ip);update_mask=address_value(state.mask);
@@ -422,7 +456,7 @@ static bool ping_valid_locked(unsigned generation)
 bool wired_ping_reserve(dhcp_status_t *snapshot)
 {
     portENTER_CRITICAL(&lock);
-    bool ok = initialized && !ping_reserved && !update_reserved && link_up && state.active && !state.busy &&
+    bool ok = initialized && !ping_reserved && !update_reserved && !profinet_reserved && link_up && state.active && !state.busy &&
               !state.cleanup_error && pending == CMD_NONE && rx_enabled && tx_enabled;
     if (ok) {
         ping_reserved = true; ping_window = false; ping_generation = address_generation;

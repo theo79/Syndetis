@@ -10,7 +10,7 @@ main{max-width:880px;margin:auto;padding:32px 20px}header{margin-bottom:30px}h1{
 .label{text-transform:uppercase;letter-spacing:.12em;font-size:12px;color:#87d4d3}#connection{margin:24px 0;padding:12px 16px;border:1px solid #57717e;border-radius:8px;background:#243139}
 #connection.stale{color:#ffd3a8;border-color:#d39a5c}section{border:1px solid #354a55;border-radius:12px;background:#17262e;margin:20px 0;padding:20px}h2{font-size:20px;margin:0 0 16px}dl{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:0}dt{color:#a8bdc7}dd{margin:0;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.stale-data{opacity:.55}footer{font-size:14px;color:#a8bdc7}#last{font-size:13px}#error{color:#ffd3a8}
 button{font:inherit;padding:8px 14px;margin:6px 6px 0 0;cursor:pointer}button:disabled{opacity:.45;cursor:default}
-.neighbor{border-top:1px solid #354a55;margin-top:18px;padding-top:16px}.neighbor h3{margin:0 0 12px;font-size:17px}.expired{border-left:3px solid #d39a5c;padding-left:12px}
+.neighbor{border-top:1px solid #354a55;margin-top:18px;padding-top:16px}.neighbor h3{margin:0 0 12px;font-size:17px;overflow-wrap:anywhere}.expired{border-left:3px solid #d39a5c;padding-left:12px}
 @media(max-width:480px){main{padding:24px 16px}h1{font-size:32px}section{padding:16px}dl{gap:12px;font-size:14px}}
 </style>
 <main>
@@ -20,6 +20,7 @@ button{font:inherit;padding:8px 14px;margin:6px 6px 0 0;cursor:pointer}button:di
 <section><h2>Device</h2><dl><dt>Firmware</dt><dd id="firmware">—</dd><dt>Uptime</dt><dd id="uptime">—</dd></dl></section>
 <section><h2>Ethernet</h2><dl><dt>Initialization</dt><dd id="initialization">—</dd><dt>Physical link</dt><dd id="link">—</dd><dt>Negotiated speed</dt><dd id="speed">—</dd><dt>Duplex</dt><dd id="duplex">—</dd><dt>Ethernet MAC</dt><dd id="mac">—</dd><dt>Addressing mode</dt><dd id="address-mode">NO IP</dd><dt>Ethernet IP</dt><dd id="ip">Not configured</dd><dt>Manual prefix</dt><dd id="address-prefix">—</dd><dt>Active gateway</dt><dd id="address-gateway">—</dd></dl><p id="error" hidden></p><p id="address-state"></p><p>Manual IPv4 is configured on the physical tester. USE DHCP releases it; DHCP then requires Start. No connectivity test is performed.</p></section>
 <section><h2>Switch Info</h2><p id="switch-state">Waiting for status</p><p id="switch-limits"></p><div id="neighbors"></div><p>Passive advertisements only. Advertised addresses belong to the neighbor, not the tester. PVID/native VLAN is not a complete VLAN list.</p></section>
+<section><h2>PROFINET Discovery</h2><p>Start discovery on the tester. Results show devices that replied on the wired link.</p><p id="profinet-state">Waiting for status</p><p id="profinet-limits"></p><p id="profinet-conflicts"></p><div id="profinet-devices"></div></section>
 <section><h2>DHCP Test</h2><p id="dhcp-state">IPv4 off / passive</p>
 <dl><dt>Elapsed / acquisition</dt><dd id="dhcp-time">—</dd><dt>Tester IPv4</dt><dd id="dhcp-ip">No current address</dd><dt>Subnet mask</dt><dd id="dhcp-mask">—</dd><dt>Gateway</dt><dd id="dhcp-gateway">—</dd><dt>DNS</dt><dd id="dhcp-dns">—</dd></dl>
 <p><button id="dhcp-start" disabled>Start</button> <button id="dhcp-stop" disabled>Stop / Release</button></p><p id="dhcp-action" role="status"></p>
@@ -41,7 +42,7 @@ function downloadReport(){
   if(!lastSnapshot)return;
   const now=Date.now(), age=Math.max(0,now-lastSuccess);
   const identifiers=el('report-identifiers').checked;
-  const {firmware,uptime_seconds,ethernet,addressing,dhcp,switch_info}=lastSnapshot;
+  const {firmware,uptime_seconds,ethernet,addressing,dhcp,switch_info,profinet}=lastSnapshot;
   const pick=(source, keys)=>Object.fromEntries(keys.map(key=>[key,source[key]]));
   const report={
     schema_version:1,
@@ -64,6 +65,12 @@ function downloadReport(){
       neighbors:switch_info.neighbors.map(n=>pick(n,['slot','protocol','ttl_seconds','age_seconds',
         'expired','sanitized',...(identifiers?['source_mac','name','chassis','port_id',
           'port_description','management_ip','management_source','vlan_kind','vlan']:[])]))
+    },
+    profinet:profinet==null?null:{
+      ...pick(profinet,['state','device_count','capacity','completion','valid','age_ms','error_code',
+        'overflow','malformed','queue_drops','duplicate_name','duplicate_ip','reported_ip_conflict','text_limited']),
+      ...(identifiers?{devices:profinet.devices.map(d=>pick(d,['source_mac','station_name','device_type',
+        'ip','mask','gateway','ip_status','vendor_id','device_id','role_flags','duplicate_name','duplicate_ip','text_limited']))}:{})
     },
     ping_statistics:'unavailable',
     device_wall_clock:'unavailable'
@@ -134,6 +141,51 @@ function renderSwitch(info){
     card.append(list);container.append(card);
   }
 }
+const profinetWarnings=d=>[
+  d.duplicate_name&&'Possible duplicate station names',
+  d.duplicate_ip&&'Possible duplicate IPv4 addresses',
+  (d.reported_ip_conflict||(d.ip_status & 0x80))&&'Device-reported IPv4 conflict'
+].filter(Boolean).join(' · ');
+function renderProfinet(scan){
+  const container=el('profinet-devices');
+  container.replaceChildren();
+  el('profinet-limits').textContent='';
+  el('profinet-conflicts').textContent='';
+  if(scan==null){el('profinet-state').textContent='Discovery status unavailable';return;}
+  if(!Array.isArray(scan.devices)||scan.devices.length>32||scan.devices.length!==scan.device_count||
+     typeof scan.state!=='string'||typeof scan.valid!=='boolean')throw new Error('Invalid PROFINET status');
+  const age=scan.age_ms===null?'No scan yet':`Scan started ${Math.floor(scan.age_ms/1000)} s ago`;
+  const validity=!scan.valid&&scan.age_ms!==null?' · Historical results':'';
+  el('profinet-state').textContent=`${scan.state} · ${scan.device_count} found · ${age} · ${scan.completion}${validity}`;
+  el('profinet-limits').textContent=`Capacity ${scan.capacity} · overflow ${scan.overflow} · malformed ${scan.malformed} · queue drops ${scan.queue_drops}`+
+    (scan.error_code?` · error ${scan.error_code}`:'')+(scan.text_limited?' · Some text was shortened or sanitized':'');
+  el('profinet-conflicts').textContent=profinetWarnings(scan);
+  if(scan.age_ms!==null&&scan.completion!=='pending'&&!scan.device_count){
+    const empty=document.createElement('p');empty.textContent='No devices found';container.append(empty);
+  }
+  const hex=n=>n===null?null:'0x'+n.toString(16).toUpperCase();
+  const ipStatus=n=>n===null?null:`${['IP not set','IP set','IP set by DHCP'][n & ~0x80]||'Unknown status'} (${hex(n)})`;
+  for(const d of scan.devices){
+    const card=document.createElement('div');
+    card.className='neighbor'+(scan.valid?'':' expired');
+    const title=document.createElement('h3');
+    title.textContent=d.station_name||d.source_mac;
+    card.append(title);
+    const list=document.createElement('dl');
+    for(const [name,value] of [['Station name',d.station_name],['Source MAC',d.source_mac],
+      ['Device type',d.device_type],['IPv4',d.ip],['Subnet mask',d.mask],['Gateway',d.gateway],
+      ['Vendor ID',hex(d.vendor_id)],['Device ID',hex(d.device_id)],['Role flags',hex(d.role_flags)],
+      ['IP status',ipStatus(d.ip_status)]]){
+      const label=document.createElement('dt'), data=document.createElement('dd');
+      label.textContent=name;data.textContent=value===null?'Unavailable':value===''?'(empty)':String(value);
+      list.append(label,data);
+    }
+    card.append(list);
+    const warnings=profinetWarnings(d);
+    if(warnings){const note=document.createElement('p');note.textContent=warnings;card.append(note);}
+    container.append(card);
+  }
+}
 function stale(){
   el('connection').textContent='Tester unreachable · displayed data is stale';
   el('connection').classList.add('stale');
@@ -168,6 +220,7 @@ async function poll(){
     el('error').hidden=e.initialization!=='Error';
     el('error').textContent=e.initialization==='Error'?`Ethernet error: ${e.error_step} (code ${e.error_code})`:'';
     renderSwitch(s.switch_info);
+    renderProfinet(s.profinet);
     renderDhcp(s.dhcp,e.link);
     lastSuccess=receivedAt;
     lastSnapshot=s;

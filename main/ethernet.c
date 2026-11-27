@@ -40,7 +40,9 @@ static void ethernet_event(void *arg, esp_event_base_t base, int32_t id, void *d
         status_ethernet_link(true, mbps, mode);
         discovery_link(true);
         dhcp_test_link(true);
+        profinet_link(true);
     } else if (id == ETHERNET_EVENT_DISCONNECTED || id == ETHERNET_EVENT_STOP) {
+        profinet_link(false);
         status_ethernet_link(false, 0, 0);
         discovery_link(false);
         dhcp_test_link(false);
@@ -104,10 +106,12 @@ esp_err_t ethernet_start(void)
     status_set_ethernet(&state);
     step = "Driver start";
     if ((err = esp_eth_start(driver)) != ESP_OK) goto failed;
+    profinet_init(driver, state.mac);
     ESP_LOGI("ethernet", "LAN8720 monitoring started in passive mode; DHCP requires explicit Start");
     return ESP_OK;
 
 failed:
+    profinet_link(false);
     discovery_link(false);
     // No successfully started Ethernet driver is torn down during web operations.
     if (event_instance) esp_event_handler_instance_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, event_instance);

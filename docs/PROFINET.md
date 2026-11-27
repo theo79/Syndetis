@@ -1,0 +1,26 @@
+# PROFINET discovery in v0.7.0
+
+The WT32-ETH01 uses its wired Ethernet MAC to send a single DCP Identify All request when the operator selects **PROFINET → Start discovery** on the OLED. Ethernet link is required and IPv4 is optional. Boot, link changes, menu entry, and browser polling leave DCP transmission off. The implementation provides no PROFINET IO or DCP configuration services. The request may prompt multiple devices to reply on the segment.
+
+## Wire format and interoperability
+
+- Untagged Ethernet request to `01:0E:CF:00:00:00`, EtherType `0x8892`, Frame ID `0xFEFE`, service `0x05`, service type `0x00`. The request uses a fresh nonzero 32-bit XID, network byte order, and a four-byte `FF FF 00 00` All selector. The frame is zero-padded to the 60-byte minimum before hardware FCS. [Scapy protocol definitions](https://github.com/secdev/scapy/blob/master/scapy/contrib/pnio_dcp.py) · [PROFINET University](https://profinetuniversity.com/naming-addressing/profinet-dcp/)
+- The big-endian ResponseDelayFactor is 128. The responder spreads replies over 10 ms steps, up to `(128 − 1) × 10 ms = 1.27 s`. The tester listens for 5 s to allow for response processing and scheduling, then applies a 3 s cooldown. [rt-labs p-net response-delay reference](https://github.com/rtlabs-com/p-net/blob/public/src/common/pf_dcp.c)
+- The receiver accepts successful Identify responses (`0xFEFF`, service `0x05`, type `0x01`) addressed to its own MAC from a unicast peer with the current XID. It handles up to two `802.1Q` or `802.1ad` tags on received frames. It bounds reads by the DCP data length, skips unknown options, and accounts for odd-length block padding in the data length. Recognized response blocks begin with two bytes of BlockInfo. The IP status is kept as advertised. Bit `0x0080` indicates device-reported conflict. [Wireshark field reference](https://www.wireshark.org/docs/dfref/p/pn_dcp.html) · [Wireshark DCP dissection reference](https://github.com/wireshark/wireshark/blob/master/plugins/epan/profinet/packet-pn-dcp.c) · [Scapy block layouts](https://scapy.readthedocs.io/en/stable/api/scapy.contrib.pnio_dcp.html)
+- Discovery reaches the local Layer 2 forwarding domain. Switch policies, VLAN membership, multicast forwarding, device support, traffic, queue capacity, and timing can affect results. Tagged responses require forwarding and delivery through the existing Ethernet driver. A completed window describes the collection period. The inventory covers responding devices seen by the tester. [PLC4X PROFINET discovery scope](https://plc4x.apache.org/plc4x/latest/users/protocols/profinet.html)
+- The newest accepted response for each source MAC supplies that record. The inventory holds 32 devices and the worker queue holds eight frames. Sanitized printable text is limited to 240 bytes for station names and 64 bytes for device type. Potential duplicates use displayed nonempty names and literal advertised nonzero IPv4 addresses. Link loss invalidates this session even if a link comes back before the dashboard polls.
+
+## Diagnostic report compatibility
+
+Schema version remains **1** because the new `profinet` object is additive and existing keys and semantics are preserved. The object contains aggregate state, device count, age at snapshot, link validity, completion, counters, and conflict flags. Scan age measures elapsed time since the request session started. A `null` age means no scan has started. An unavailable PROFINET snapshot is represented by `null`. The per-device array is exported only with **Include network identifiers**, including all names, addresses, device types, IDs, and device-specific flags. If the browser loses contact, an open tab can still export its last valid snapshot, marked stale.
+
+## Isolated lab acceptance
+
+Perform these checks only after the project owner approves local installation on a test unit.
+
+1. With a capture on the isolated link, boot the tester and open both the OLED PROFINET menu and the dashboard. Confirm there is no DCP transmission.
+2. Leave wired IPv4 off. Start discovery on the OLED with known responders connected. Confirm one untagged Identify All request from the tester’s wired MAC, matching-XID replies, expected devices and properties, and automatic completion after five seconds.
+3. Exercise an empty segment, held-OK cancellation, the cooldown, and a port change during and after a scan. Check that previous results visibly become historical and a fresh scan replaces them.
+4. Use isolated fixtures for duplicate names and IPs, malformed blocks, tagged replies where forwarding permits them, and more responders than the inventory can hold. Compare captured data with both displays and verify drop or overflow indicators.
+5. Exercise DHCP, manual IPv4, ping, LLDP/CDP, and both OTA transports. Confirm wired diagnostics and OTA reservations exclude discovery as intended. Check Wi-Fi dashboard responsiveness and available heap while viewing the largest inventory. Verify OTA upload, version, reboot, and rollback behavior using the existing hardware acceptance workflow.
+6. Export reports with the identifier checkbox clear and selected. Disconnect the browser and confirm the open tab still exports the last valid snapshot as stale.

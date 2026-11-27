@@ -86,6 +86,10 @@ const next = () => {
   await finish(fixture());
   assert.equal(element('firmware').textContent, '0.5.0');
   assert.equal(element('neighbors').children.length,2);
+  assert.match(element('profinet-devices').children[0].children[0].textContent,/<img src=x/);
+  assert.match(element('profinet-state').textContent,/1 found.*5 s ago.*partial/);
+  assert.match(element('profinet-limits').textContent,/overflow 1.*malformed 2.*queue drops 3/);
+  assert.match(element('profinet-conflicts').textContent,/duplicate station names.*duplicate IPv4 addresses/);
   assert.equal(element('speed').textContent, '100 Mbps');
   assert.equal(element('duplex').textContent, 'Full');
   assert.equal(element('ip').textContent, 'Not configured');
@@ -102,6 +106,7 @@ const next = () => {
   assert.equal(element('speed').textContent, 'Unavailable');
   assert.equal(element('duplex').textContent, 'Unavailable');
   assert.equal(element('neighbors').children.length,0,'clear identity on link down');
+  assert.match(element('profinet-state').textContent,/Historical results/);
   assert.ok(!element('data').classList.contains('stale-data'), 'recover automatically');
   clock += 5000;
   visibility.forEach(fn => fn());
@@ -182,6 +187,12 @@ const next = () => {
   assert.equal(redacted.ping_statistics,'unavailable');
   assert.equal(redacted.device_wall_clock,'unavailable');
   assert.equal(redacted.dhcp.error_step,null);
+  assert.equal(redacted.profinet.device_count,1);
+  assert.equal(redacted.profinet.duplicate_name,true);
+  assert.equal(redacted.profinet.reported_ip_conflict,true);
+  assert.equal(redacted.profinet.age_ms,5300);
+  assert.ok(!Object.hasOwn(redacted.profinet,'devices'));
+  assert.ok(!JSON.stringify(redacted).includes('192.0.2.44'));
   const [lldp,cdp]=redacted.switch_info.neighbors;
   assert.deepEqual(lldp,{slot:1,protocol:'LLDP',ttl_seconds:120,age_seconds:121,expired:true,sanitized:false});
   assert.equal(cdp.protocol,'CDP');
@@ -206,6 +217,7 @@ const next = () => {
   assert.deepEqual(optedIn.addressing,reportStatus.addressing);
   assert.deepEqual(optedIn.dhcp.dns,[null,null]);
   assert.deepEqual(optedIn.switch_info.neighbors,reportStatus.switch_info.neighbors);
+  assert.deepEqual(optedIn.profinet.devices,reportStatus.profinet.devices);
   assert.equal(optedIn.switch_info.neighbors[1].chassis,null);
   assert.ok(!Object.hasOwn(optedIn.switch_info.neighbors[1],'port_id'));
 
@@ -217,6 +229,7 @@ const next = () => {
   assert.equal(offline.snapshot_age_ms,5000);
   assert.equal(offline.stale,true);
   assert.deepEqual(offline.switch_info,optedIn.switch_info);
+  assert.deepEqual(offline.profinet,optedIn.profinet);
   next();
   await finish(fixture('Down'));
   assert.equal((await getReport()).stale,false);
@@ -226,6 +239,7 @@ const next = () => {
   assert.equal(aged.ethernet.speed_mbps,null);
   assert.equal(aged.ethernet.duplex,'Unavailable');
   assert.deepEqual(aged.switch_info.neighbors,[]);
+  assert.equal(aged.profinet.valid,false);
   assert.ok(!Object.hasOwn(aged,'addressing'));
   timers.filter(t=>t.active&&t.ms===1500).forEach(t=>t.fn());
   assert.equal(revoked.length,downloads.length);

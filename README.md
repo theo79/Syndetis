@@ -6,7 +6,23 @@ Syndetis is a small ESP32-based project designed for network technicians, indust
 
 The idea is simple: connect to a network port, check what is happening, and get useful information without having to reach for a laptop every time.
 
-**Current stable firmware:** [v0.6.0](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1
+**Current stable firmware:** [v0.7.0](https://github.com/theo79/Syndetis/releases/tag/v0.7.0) &nbsp; | &nbsp; **Previous stable firmware:** [v0.6.0](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) &nbsp; | &nbsp; **Platform:** WT32-ETH01 / ESP-IDF v6.1
+
+Syndetis pairs passive **LLDP/CDP** neighbor discovery with user-initiated **PROFINET DCP** discovery on the wired link. The PROFINET scan runs at Layer 2 with wired IPv4 off.
+
+## Industrial Field Testing
+
+| PROFINET discovery | Mobile dashboard status |
+| :---: | :---: |
+| <img src="docs/images/v070-profinet-discovery.png" alt="Syndetis v0.7.0 PROFINET discovery during field testing" width="320"> | <img src="docs/images/v070-dashboard-status.png" alt="Syndetis v0.7.0 mobile dashboard link status" width="320"> |
+
+| Passive LLDP discovery | Diagnostic report download |
+| :---: | :---: |
+| <img src="docs/images/v070-lldp-discovery.png" alt="Syndetis v0.7.0 passive LLDP discovery during field testing" width="320"> | <img src="docs/images/v070-diagnostic-report.png" alt="Syndetis v0.7.0 JSON diagnostic report download" width="320"> |
+
+Actual Syndetis v0.7.0 field testing on a Siemens SIMATIC S7-1200 PLC. Sensitive network identifiers have been redacted for privacy.
+
+See the [November 27, 2026 field acceptance record](docs/v0.7.0-field-acceptance.md).
 
 ---
 
@@ -29,9 +45,10 @@ The idea is simple: connect to a network port, check what is happening, and get 
 ### Ethernet and switch information
 
 - Detect Ethernet link status, negotiated speed (10/100 Mbps), and duplex.
-- Discover neighboring equipment through **LLDP** and **CDP**.
+- Passively discover neighboring equipment through **LLDP** and **CDP**.
 - Display advertised switch/device identity, port, and VLAN information when available.
 - Listen for neighbor advertisements without starting an IPv4 test.
+- Discover responding **PROFINET** stations with an OLED-initiated **DCP Identify All** scan while wired IPv4 is off.
 
 ### Network diagnostics
 
@@ -43,12 +60,12 @@ The idea is simple: connect to a network port, check what is happening, and get 
 ### Local interface and web access
 
 - Navigate the device using a **128×64 OLED** and **UP / DOWN / OK** buttons.
-- Enable a local Wi-Fi access point and view Ethernet status, switch discovery information, and DHCP results in a browser.
+- Enable a local Wi-Fi access point and view Ethernet status, LLDP/CDP neighbors, PROFINET results and counters, and DHCP results in a browser.
 - Start or stop a DHCP test through the web dashboard.
 - Export a JSON diagnostic report, with network identifiers omitted by default.
 - Update the firmware over Ethernet or Wi-Fi, with a USB-UART recovery path.
 
-Syndetis is intended for **quick, targeted diagnostics**, not continuous monitoring or comprehensive network scanning. The current hardware supports 10/100 Mbps only; it does not measure cable length, certify cabling, or provide Gigabit Ethernet link negotiation. Advertised VLAN information is not a complete VLAN inventory, and discovery depends on the neighboring equipment sending LLDP/CDP advertisements.
+Syndetis is intended for **quick, targeted diagnostics**, not continuous monitoring or comprehensive network scanning. The current hardware supports 10/100 Mbps only; it does not measure cable length, certify cabling, or provide Gigabit Ethernet link negotiation. Advertised VLAN information is not a complete VLAN inventory. Passive discovery depends on neighboring equipment sending LLDP/CDP advertisements.
 
 ## Using Syndetis
 
@@ -64,13 +81,25 @@ By default, Syndetis does not start an IPv4 diagnostic session until you explici
 
 Use UP and DOWN to move through menus, press OK to select, and hold OK for approximately 500 ms to go back. Numeric editors support button repeat.
 
+Main menu order in v0.7.0 is **Link & IP**, **Switch Info**, **PROFINET**, **Network Tests**, **Device Info**, **Web Access**, **About**, **Settings**, **Diagnostic Report**.
+
+### PROFINET discovery
+
+1. Connect to an authorized diagnostic port with an Ethernet link. The tester's wired interface can stay without an IPv4 address.
+2. On the OLED, select **PROFINET → Start discovery**. The tester sends one DCP Identify All request and listens for five seconds. Hold OK to cancel.
+3. Open **View results** to scroll the last inventory. Select a station to see its advertised details. Unnamed stations appear by MAC address. A three-second cooldown follows each scan.
+
+The inventory shows the source MAC and, when advertised, the station name, device type, IPv4 address, subnet mask, gateway, vendor and device IDs, role flags, and IP status. It flags potential duplicates within the sample and marks results historical after link loss. The dashboard displays the same discovery results and counters. Starting a scan requires the physical buttons.
+
+The Layer 2 query reads advertised information. Boot, link changes, opening the menu, and dashboard polling leave DCP transmission off. Results depend on which devices reply and how the connected segment forwards Layer 2 traffic. See the [PROFINET implementation and discovery scope](docs/PROFINET.md).
+
 ### Web dashboard
 
 From the device's main menu, select **Web Access → Enable**. Connect to the Wi-Fi network shown on the OLED using the displayed password, then open:
 
 **http://192.168.4.1/**
 
-The dashboard shows live Ethernet information, IP/DHCP state, and discovered switch information. Browser dashboard access is through the device's Wi-Fi hotspot, not its wired Ethernet address.
+The dashboard shows live Ethernet information, IP/DHCP state, discovered switch information, and PROFINET results. Browser dashboard access is through the device's Wi-Fi hotspot, not its wired Ethernet address.
 
 The prototype dashboard has no separate login once hotspot access is enabled. Use it on trusted networks and disable Web Access when you're finished.
 
@@ -82,7 +111,7 @@ The prototype dashboard has no separate login once hotspot access is enabled. Us
 
 The report includes firmware version and uptime, Ethernet initialization and link status, negotiated speed and duplex, wired addressing mode and state, DHCP status and timing, and LLDP/CDP discovery status, counters, neighbor protocol, TTL, age, and expiry. It includes Ethernet and DHCP error details when available. Ping statistics and device wall-clock timestamps are unavailable in the report.
 
-Network identifiers are omitted by default. Select **Include network identifiers** to include available MAC and IP addresses, subnet, gateway and DNS settings, and switch, chassis, port and VLAN details. These fields can reveal network topology when you share the file. Review reports before sharing them.
+Network identifiers are omitted by default. Select **Include network identifiers** to include available MAC and IP addresses, subnet, gateway and DNS settings, switch, chassis, port and VLAN details, and the PROFINET device inventory. The default PROFINET section contains scan state, count, age, validity, completion, error and drop counters, and aggregate conflict flags. These optional identifiers can reveal network topology when you share the file. Review reports before sharing them.
 
 The report uses the last valid dashboard snapshot and records browser UTC receipt and export times, snapshot age, and whether the data is stale. A failed status poll or a snapshot older than four seconds marks the data stale. You can still download it after disconnecting if the dashboard tab stays open and has received a valid update. Reloading or closing the page discards the cached snapshot.
 
@@ -173,7 +202,7 @@ This is still prototype hardware; a custom PCB and enclosure are potential futur
 ### First installation and smoke test
 
 1. With power disconnected, assemble the OLED and buttons using the wiring tables above.
-2. Obtain the [current firmware release](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) or build the firmware from source as described below.
+2. Obtain the [current firmware release](https://github.com/theo79/Syndetis/releases/tag/v0.7.0) or build the firmware from source as described below.
 3. Use a 3.3V-logic USB-UART adapter and follow [`RESTORE_USB.md`](RESTORE_USB.md) and the release documentation for initial flashing. A raw OTA application image alone is not a complete blank-device installation.
 4. After flashing, boot normally with the programming strap released. Check that the OLED displays the main menu and that all three buttons respond.
 5. Connect to a known working Ethernet port. Check **Link & IP**, then **Switch Info** if the connected equipment advertises LLDP/CDP.
@@ -211,7 +240,7 @@ python3 scripts/run_ota_crypto_tests.py --idf-path "$IDF_PATH"
 python3 tests/ota_identity_test.py --idf-path "$IDF_PATH"
 ```
 
-See the [v0.5.2 release manifest](docs/RELEASE_MANIFEST.md) for historical build and verification results and the [v0.6.0 release](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) for current release information. Historical results are not a claim that every check has been reproduced for every version or environment.
+See the [v0.7.0 release manifest](docs/v0.7.0-release.md) for build and image verification and the [v0.5.2 release manifest](docs/RELEASE_MANIFEST.md) for historical results.
 
 ## Firmware updates
 
@@ -224,17 +253,18 @@ On the device, open **Settings → Firmware Update** and use one of the followin
 
 Upload a trusted, **strictly newer** Syndetis application `.bin` image. The firmware uses two OTA application slots, image validation, and trial-boot rollback.
 
+Download `Syndetis-v0.7.0.bin` and its SHA-256 checksum file from the [current stable release](https://github.com/theo79/Syndetis/releases/tag/v0.7.0).
+
 **Important:** Updates use HTTP without transport encryption or cryptographic authentication of the firmware author. Only use trusted images, a controlled local connection, and stable power during an update. USB recovery details are in [`RESTORE_USB.md`](RESTORE_USB.md).
 
 ## Project status
 
-**[v0.6.0](https://github.com/theo79/Syndetis/releases/tag/v0.6.0) is the current stable firmware**, published on November 26, 2026, following user-reported hardware testing and successful verification of the downloadable JSON diagnostic report. It adds dashboard JSON diagnostic reports and the OLED Diagnostic Report screen. **v0.5.2** is the previous hardware-accepted version.
+**v0.7.0** is the current stable firmware following the project owner's November 27, 2026 field acceptance on a Siemens SIMATIC S7-1200 test setup. **v0.6.0**, the previous stable release, introduced browser JSON diagnostic reports and the OLED Diagnostic Report screen.
 
-The v0.6.0 hardware acceptance is based on the project owner's report, not independent laboratory certification. The historical release manifest and field-acceptance record below document the earlier v0.5.2 acceptance; they should not be interpreted as a complete new hardware acceptance test for v0.6.0.
-
-For technical details, verification scope, and known limitations:
-
-- [Current stable release — v0.6.0](https://github.com/theo79/Syndetis/releases/tag/v0.6.0)
+- [Current stable release — v0.7.0](https://github.com/theo79/Syndetis/releases/tag/v0.7.0)
+- [Changelog](CHANGELOG.md)
+- [v0.7.0 release manifest](docs/v0.7.0-release.md)
+- [v0.7.0 field acceptance](docs/v0.7.0-field-acceptance.md)
 - [Historical v0.5.2 release manifest](docs/RELEASE_MANIFEST.md)
 - [Historical v0.5.2 field acceptance results](docs/FINAL_FIELD_ACCEPTANCE.md)
 - [Reliability report](docs/FINAL_RELIABILITY_REPORT.md)
@@ -245,12 +275,14 @@ The goal remains the same: **quick, easy, informative Ethernet diagnostics**. Th
 
 | Area | Direction |
 | --- | --- |
-| Display and interface | Larger display and a refined, glanceable interface |
+| Interface | Small OLED + browser dashboard, or screenless device + browser dashboard |
 | Portable power | Integrated battery and charging |
 | Ethernet | Researching 10/100/1000 Mbps link negotiation, including modular Ethernet hardware alongside an ESP32-based controller |
 | Data logging | Optional local storage or SD card logging under consideration |
 | Cable diagnostics | Exploring VCT/TDR capabilities where supported by the selected hardware |
 | Mechanical design | More compact, field-friendly assembly and enclosure |
+
+Both interface concepts use the browser dashboard. No dedicated native mobile application is planned.
 
 V2 is in the research and design stage. No hardware platform, final feature set, price, or release date has been selected. Gigabit link negotiation is a research goal, not a promise of gigabit throughput. Affordability, component availability, power consumption, and ease of replication will guide hardware selection. The current WT32-ETH01 version remains usable independently of this roadmap.
 
